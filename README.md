@@ -1019,13 +1019,9 @@ Recomendações:
 
 ## 👨‍💻 Autor
 
-**Bruno Alves**
+**Bruno Neemias **
 
 Projeto desenvolvido como laboratório acadêmico e prático de segurança defensiva, com foco em SIEM, SOC, NDR, XDR, Sysmon, Active Response e Inteligência Artificial aplicada à análise de alertas.
-
-[![LinkedIn](https://img.shields.io/badge/LinkedIn-Conectar-0077B5?logo=linkedin&logoColor=white)](https://linkedin.com/in/SEU_PERFIL)
-[![GitHub](https://img.shields.io/badge/GitHub-Perfil-181717?logo=github&logoColor=white)](https://github.com/SEU_USUARIO)
-
 ---
 
 ## 🏁 Conclusão
