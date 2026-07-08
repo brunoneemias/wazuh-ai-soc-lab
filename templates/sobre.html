@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <title>Sobre o Projeto - AI SOC Assistant</title>
+    <style>
+        :root {
+            --bg: #020617;
+            --panel: rgba(3, 7, 18, 0.92);
+            --border: rgba(0, 255, 156, 0.22);
+            --green: #00ff9c;
+            --cyan: #00d9ff;
+            --text: #d1fae5;
+            --muted: #94a3b8;
+            --yellow: #fde047;
+            --danger: #fb7185;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            background:
+                radial-gradient(circle at top left, rgba(0,217,255,0.10), transparent 25%),
+                radial-gradient(circle at bottom right, rgba(0,255,156,0.08), transparent 25%),
+                #020617;
+            color: var(--text);
+            font-family: Consolas, "Courier New", monospace;
+            min-height: 100vh;
+            padding: 24px;
+        }
+
+        .container {
+            max-width: 1300px;
+            margin: 0 auto;
+            background: var(--panel);
+            border: 1px solid var(--border);
+            border-radius: 18px;
+            overflow: hidden;
+            box-shadow:
+                0 0 30px rgba(0,0,0,0.55),
+                0 0 18px rgba(0,255,156,0.10);
+        }
+
+        .header {
+            padding: 18px 22px;
+            border-bottom: 1px solid rgba(0,255,156,0.14);
+            background: linear-gradient(90deg, rgba(0,255,156,0.09), rgba(0,217,255,0.07));
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .title {
+            color: var(--green);
+            font-size: 24px;
+            font-weight: bold;
+            text-shadow: 0 0 10px rgba(0,255,156,0.35);
+        }
+
+        .title::before {
+            content: ">";
+            color: var(--cyan);
+            margin-right: 8px;
+        }
+
+        .actions a {
+            color: var(--green);
+            border: 1px solid rgba(0,255,156,0.28);
+            padding: 10px 14px;
+            border-radius: 10px;
+            text-decoration: none;
+            margin-left: 8px;
+            display: inline-block;
+        }
+
+        .actions a:hover {
+            color: var(--cyan);
+            border-color: var(--cyan);
+        }
+
+        .content {
+            padding: 24px;
+        }
+
+        .subtitle {
+            color: var(--muted);
+            line-height: 1.6;
+            margin-bottom: 24px;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+
+        .card {
+            background: rgba(2, 6, 23, 0.65);
+            border: 1px solid rgba(0,255,156,0.14);
+            border-radius: 14px;
+            padding: 18px;
+        }
+
+        .card h3 {
+            margin-top: 0;
+            color: var(--cyan);
+            font-size: 16px;
+        }
+
+        .card p, .card li {
+            color: #e5e7eb;
+            line-height: 1.6;
+            font-size: 14px;
+        }
+
+        .section {
+            margin-top: 24px;
+            background: rgba(2, 6, 23, 0.55);
+            border: 1px solid rgba(0,217,255,0.14);
+            border-radius: 14px;
+            padding: 20px;
+        }
+
+        .section h2 {
+            color: var(--green);
+            margin-top: 0;
+            border-bottom: 1px solid rgba(0,255,156,0.14);
+            padding-bottom: 8px;
+        }
+
+        .section p, .section li {
+            color: #e5e7eb;
+            line-height: 1.65;
+        }
+
+        code {
+            color: var(--yellow);
+            background: rgba(253,224,71,0.08);
+            padding: 2px 6px;
+            border-radius: 6px;
+        }
+
+        pre {
+            background: #020617;
+            border: 1px solid rgba(0,217,255,0.18);
+            padding: 16px;
+            border-radius: 12px;
+            overflow-x: auto;
+            color: var(--text);
+        }
+
+        .badge {
+            display: inline-block;
+            border: 1px solid rgba(0,255,156,0.25);
+            color: var(--green);
+            padding: 5px 9px;
+            border-radius: 999px;
+            margin: 4px 4px 4px 0;
+            font-size: 12px;
+            background: rgba(0,255,156,0.05);
+        }
+
+        .footer {
+            margin-top: 24px;
+            color: var(--muted);
+            border-top: 1px solid rgba(148,163,184,0.14);
+            padding-top: 18px;
+            line-height: 1.6;
+        }
+
+        .highlight {
+            color: var(--cyan);
+            font-weight: bold;
+        }
+
+        @media (max-width: 768px) {
+            body {
+                padding: 12px;
+            }
+
+            .header {
+                flex-direction: column;
+                gap: 12px;
+                align-items: flex-start;
+            }
+
+            .actions a {
+                margin-left: 0;
+                margin-right: 8px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="title">Sobre o Projeto</div>
+
+            <div class="actions">
+                <a href="/">Voltar ao Chat</a>
+                <a href="/historico">Histórico</a>
+                <a href="/logout">Logout</a>
+            </div>
+        </div>
+
+        <div class="content">
+            <div class="subtitle">
+                Projeto: <span class="highlight">Wazuh AI SOC Lab</span><br>
+                Analista logado: <strong>{{ analista }}</strong><br>
+                Ambiente de laboratório simulando um cenário corporativo de produção.
+            </div>
+
+            <div class="grid">
+                <div class="card">
+                    <h3>SIEM/XDR</h3>
+                    <p>
+                        O Wazuh centraliza alertas de segurança, eventos de endpoints,
+                        autenticação, integridade de arquivos, Windows/Sysmon e Suricata.
+                    </p>
+                </div>
+
+                <div class="card">
+                    <h3>NDR/IDS</h3>
+                    <p>
+                        O Suricata atua como sensor de rede, gerando alertas IDS/NDR
+                        enviados ao Wazuh através do arquivo <code>eve.json</code>.
+                    </p>
+                </div>
+
+                <div class="card">
+                    <h3>Endpoint Windows</h3>
+                    <p>
+                        O Sysmon fornece telemetria de processos, command line,
+                        conexões de rede, DNS e eventos do Windows.
+                    </p>
+                </div>
+
+                <div class="card">
+                    <h3>IA SOC</h3>
+                    <p>
+                        A aplicação Flask utiliza OpenAI API para gerar análises,
+                        relatórios, playbooks, correlação e mapeamento MITRE ATT&CK.
+                    </p>
+                </div>
+            </div>
+
+            <div class="section">
+                <h2>Objetivo</h2>
+                <p>
+                    O objetivo do projeto é demonstrar como um ambiente SOC pode utilizar
+                    Wazuh, Suricata, Sysmon e Inteligência Artificial para reduzir o tempo
+                    de triagem, apoiar a investigação inicial e gerar documentação técnica
+                    de incidentes.
+                </p>
+            </div>
+
+            <div class="section">
+                <h2>Arquitetura</h2>
+                <pre>
+Windows 11 + Sysmon
+        ↓
+Wazuh Agent
+        ↓
+Wazuh Server / Indexer / Dashboard
+        ↓
+AI SOC Assistant Flask
+        ↓
+Relatório | Playbook | Correlação | MITRE ATT&CK
+
+
+Kali Linux + Wazuh Agent + Suricata
+        ↓
+SSH | FIM | NDR | Active Response
+        ↓
+Wazuh Server
+                </pre>
+            </div>
+
+            <div class="section">
+                <h2>Funcionalidades Implementadas</h2>
+                <ul>
+                    <li>Login simples para acesso ao AI SOC Assistant.</li>
+                    <li>Chat interativo com IA para perguntas sobre alertas.</li>
+                    <li>Integração com Wazuh Indexer via API/OpenSearch.</li>
+                    <li>Coleta de alertas Suricata, SSH, FIM, Windows e Sysmon.</li>
+                    <li>Dashboard NDR com alertas de rede.</li>
+                    <li>Dashboard Windows/Sysmon para análise de endpoint.</li>
+                    <li>Relatório SOC automatizado.</li>
+                    <li>Playbook de resposta a incidente.</li>
+                    <li>Correlação de eventos com hipótese de cadeia de ataque.</li>
+                    <li>Mapeamento MITRE ATT&CK quando houver evidência suficiente.</li>
+                    <li>Histórico persistente em SQLite com nome do analista.</li>
+                    <li>Download de relatórios, playbooks, correlação, Sysmon e alertas JSON.</li>
+                </ul>
+            </div>
+
+            <div class="section">
+                <h2>Fluxo de Operação</h2>
+                <pre>
+1. Wazuh coleta alertas de Linux, Windows, Suricata e FIM.
+2. A aplicação Flask consulta o índice wazuh-alerts-*.
+3. Os eventos são normalizados em Python.
+4. A IA recebe os alertas recentes como contexto.
+5. O analista pode gerar relatório, playbook, correlação ou análise Sysmon.
+6. A consulta é salva no SQLite com data, tipo, pergunta, resposta e analista.
+7. Os relatórios podem ser baixados como evidência.
+                </pre>
+            </div>
+
+            <div class="section">
+                <h2>MITRE ATT&CK</h2>
+                <p>
+                    O projeto realiza mapeamento básico para MITRE ATT&CK com base nos
+                    eventos observados. O mapeamento é utilizado para melhorar a explicação
+                    técnica e a priorização da resposta.
+                </p>
+
+                <span class="badge">T1110 - Brute Force</span>
+                <span class="badge">T1046 - Network Service Discovery</span>
+                <span class="badge">T1059.001 - PowerShell</span>
+                <span class="badge">T1059.003 - Windows Command Shell</span>
+                <span class="badge">T1105 - Ingress Tool Transfer</span>
+                <span class="badge">T1070 - Indicator Removal</span>
+                <span class="badge">T1112 - Modify Registry</span>
+                <span class="badge">T1049 - System Network Connections Discovery</span>
+            </div>
+
+            <div class="section">
+                <h2>Componentes Monitorados</h2>
+                <ul>
+                    <li><strong>Suricata:</strong> tráfego de rede, scans, ICMP, DHCP, assinaturas IDS.</li>
+                    <li><strong>SSH:</strong> autenticação, usuários inexistentes e brute force.</li>
+                    <li><strong>FIM:</strong> criação, alteração, permissão e exclusão de arquivos.</li>
+                    <li><strong>Sysmon:</strong> processos, command line, conexões, DNS e eventos Windows.</li>
+                    <li><strong>Active Response:</strong> resposta automática, como bloqueio por iptables.</li>
+                </ul>
+            </div>
+
+            <div class="section">
+                <h2>Valor para um SOC</h2>
+                <p>
+                    O sistema não substitui o analista, mas atua como apoio para acelerar
+                    a triagem, organizar evidências, sugerir hipóteses, gerar playbooks e
+                    documentar a investigação.
+                </p>
+
+                <p>
+                    O fluxo final representa:
+                </p>
+
+                <pre>
+Detectar → Correlacionar → Analisar com IA → Gerar Playbook → Exportar Evidência → Auditar Histórico
+                </pre>
+            </div>
+
+            <div class="section">
+                <h2>Melhorias Futuras</h2>
+                <ul>
+                    <li>Exportação de relatórios em PDF.</li>
+                    <li>Integração com TheHive para criação de casos.</li>
+                    <li>Integração com Shuffle SOAR.</li>
+                    <li>Consulta a VirusTotal para enriquecimento de hashes.</li>
+                    <li>Integração com MISP para threat intelligence.</li>
+                    <li>Autenticação multiusuário.</li>
+                    <li>Deploy via Docker.</li>
+                    <li>Alertas por e-mail, Telegram ou Discord.</li>
+                </ul>
+            </div>
+
+            <div class="footer">
+                <strong>AI SOC Assistant v1.0</strong><br>
+                Ambiente educacional e controlado para demonstração de SIEM, XDR, NDR,
+                Sysmon, Active Response e IA aplicada à segurança defensiva.
+            </div>
+        </div>
+    </div>
+</body>
+</html>

@@ -1,0 +1,10 @@
+flask
+requests
+python-dotenv
+markdown
+openai
+Flask==3.1.3
+Markdown==3.9
+openai==2.37.0
+python-dotenv==1.2.1
+requests==2.32.5

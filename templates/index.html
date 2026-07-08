@@ -1,0 +1,646 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <title>AI SOC Assistant - Wazuh</title>
+    <style>
+        :root {
+            --bg: #020617;
+            --panel: rgba(3, 7, 18, 0.90);
+            --panel2: rgba(10, 16, 28, 0.92);
+            --border: rgba(0, 255, 156, 0.22);
+            --green: #00ff9c;
+            --green2: #00c97a;
+            --cyan: #00d9ff;
+            --text: #d1fae5;
+            --muted: #94a3b8;
+            --danger: #fb7185;
+            --yellow: #fde047;
+            --purple: #a78bfa;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            min-height: 100vh;
+            background: var(--bg);
+            color: var(--text);
+            font-family: Consolas, "Courier New", monospace;
+            overflow-x: hidden;
+        }
+
+        canvas#matrix {
+            position: fixed;
+            inset: 0;
+            z-index: 0;
+            opacity: 0.25;
+        }
+
+        body::before {
+            content: "";
+            position: fixed;
+            inset: 0;
+            background:
+                radial-gradient(circle at top left, rgba(0,217,255,0.10), transparent 25%),
+                radial-gradient(circle at bottom right, rgba(0,255,156,0.08), transparent 25%),
+                repeating-linear-gradient(
+                    to bottom,
+                    rgba(255,255,255,0.025) 0,
+                    rgba(255,255,255,0.025) 1px,
+                    transparent 2px,
+                    transparent 5px
+                );
+            pointer-events: none;
+            z-index: 1;
+        }
+
+        .page {
+            position: relative;
+            z-index: 2;
+            display: grid;
+            grid-template-columns: 320px 1fr;
+            gap: 18px;
+            max-width: 1450px;
+            margin: 24px auto;
+            padding: 0 20px;
+        }
+
+        .sidebar, .main {
+            background: var(--panel);
+            border: 1px solid var(--border);
+            border-radius: 18px;
+            box-shadow:
+                0 0 30px rgba(0,0,0,0.50),
+                0 0 16px rgba(0,255,156,0.08);
+            backdrop-filter: blur(8px);
+            overflow: hidden;
+        }
+
+        .terminal-header {
+            height: 46px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 16px;
+            border-bottom: 1px solid rgba(0,255,156,0.14);
+            background: linear-gradient(90deg, rgba(0,255,156,0.09), rgba(0,217,255,0.07));
+        }
+
+        .dots {
+            display: flex;
+            gap: 7px;
+        }
+
+        .dot {
+            width: 11px;
+            height: 11px;
+            border-radius: 50%;
+        }
+
+        .red { background: #ff5f56; }
+        .yellow { background: #ffbd2e; }
+        .green-dot { background: #27c93f; }
+
+        .terminal-title {
+            color: var(--muted);
+            font-size: 12px;
+            letter-spacing: 1px;
+        }
+
+        .sidebar-content, .main-content {
+            padding: 20px;
+        }
+
+        .brand-title {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            color: var(--green);
+            font-size: 30px;
+            font-weight: bold;
+            letter-spacing: 1px;
+            text-shadow:
+                0 0 8px rgba(0,255,156,0.45),
+                0 0 18px rgba(0,255,156,0.18);
+        }
+
+        .brand-title::before {
+            content: ">";
+            color: var(--cyan);
+            text-shadow: 0 0 10px rgba(0,217,255,0.55);
+        }
+
+        .brand-title-main {
+            font-size: 34px;
+        }
+
+        .brand-subtitle {
+            margin-top: 10px;
+            color: var(--muted);
+            line-height: 1.6;
+        }
+
+        .cursor {
+            color: var(--green);
+            animation: blink 1s step-end infinite;
+        }
+
+        .subtitle {
+            margin-top: 10px;
+            color: var(--muted);
+            line-height: 1.6;
+        }
+
+        .blink {
+            animation: blink 1s step-end infinite;
+        }
+
+        @keyframes blink {
+            50% { opacity: 0; }
+        }
+
+        .status-grid {
+            display: grid;
+            gap: 12px;
+            margin-top: 22px;
+        }
+
+        .status-card {
+            background: rgba(2, 6, 23, 0.72);
+            border: 1px solid rgba(0,217,255,0.14);
+            border-radius: 14px;
+            padding: 14px;
+        }
+
+        .status-label {
+            color: var(--muted);
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 6px;
+        }
+
+        .status-value {
+            color: var(--cyan);
+            text-shadow: 0 0 8px rgba(0,217,255,0.35);
+            font-weight: bold;
+        }
+
+.menu-section {
+    margin-top: 20px;
+    padding: 12px;
+    border: 1px solid rgba(0, 255, 156, 0.12);
+    border-radius: 14px;
+    background: rgba(2, 6, 23, 0.45);
+}
+
+.section-title,
+.menu-section summary {
+    color: var(--green);
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 12px;
+    cursor: pointer;
+    font-weight: bold;
+}
+
+.menu-section summary {
+    list-style: none;
+}
+
+.menu-section summary::-webkit-details-marker {
+    display: none;
+}
+
+.menu-section summary::before {
+    content: "> ";
+    color: var(--cyan);
+}
+
+.menu-section form {
+    margin-bottom: 7px;
+}
+
+.menu-section .btn,
+.menu-section button {
+    margin-bottom: 7px;
+}
+
+button, .btn {
+    width: 100%;
+    background: linear-gradient(90deg, rgba(0,255,156,0.06), rgba(0,217,255,0.04));
+    color: var(--green);
+    border: 1px solid rgba(0,255,156,0.22);
+    padding: 9px 11px;
+    border-radius: 9px;
+    cursor: pointer;
+    text-align: left;
+    font-family: Consolas, "Courier New", monospace;
+    font-weight: bold;
+    font-size: 12px;
+    box-shadow: 0 0 8px rgba(0,255,156,0.05);
+    transition: 0.2s;
+    text-decoration: none;
+    display: block;
+}
+
+button:hover, .btn:hover {
+    transform: translateX(3px);
+    border-color: var(--cyan);
+    color: var(--cyan);
+    box-shadow: 0 0 14px rgba(0,217,255,0.18);
+}
+
+.btn-danger {
+    color: var(--danger);
+    border-color: rgba(251,113,133,0.28);
+}
+
+.btn-danger:hover {
+    color: #ff8aa0;
+    border-color: #ff8aa0;
+    box-shadow: 0 0 14px rgba(251,113,133,0.18);
+}
+
+
+        .input-area {
+            margin-top: 22px;
+        }
+
+        .prompt-label {
+            color: var(--green);
+            margin-bottom: 10px;
+            display: block;
+        }
+
+        .prompt-prefix {
+            color: var(--cyan);
+        }
+
+        textarea {
+            width: 100%;
+            min-height: 145px;
+            resize: vertical;
+            border-radius: 14px;
+            border: 1px solid rgba(0,255,156,0.22);
+            background: rgba(2, 6, 23, 0.82);
+            color: var(--text);
+            padding: 16px;
+            font-family: Consolas, "Courier New", monospace;
+            font-size: 15px;
+            outline: none;
+            box-shadow: inset 0 0 18px rgba(0,255,156,0.04);
+        }
+
+        textarea:focus {
+            border-color: var(--green);
+            box-shadow: 0 0 18px rgba(0,255,156,0.15);
+        }
+
+        .main-actions {
+            display: flex;
+            gap: 12px;
+            margin-top: 14px;
+        }
+
+        .main-actions button, .main-actions .btn {
+            width: auto;
+            text-align: center;
+        }
+
+        .chat-window {
+            margin-top: 24px;
+            display: grid;
+            gap: 16px;
+        }
+
+        .message {
+            border-radius: 16px;
+            padding: 16px;
+            border: 1px solid rgba(148,163,184,0.16);
+            background: rgba(2, 6, 23, 0.72);
+        }
+
+        .message.user {
+            border-color: rgba(0,217,255,0.28);
+        }
+
+        .message.ai {
+            border-color: rgba(0,255,156,0.24);
+            box-shadow: inset 0 0 22px rgba(0,255,156,0.035);
+        }
+
+        .msg-header {
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--muted);
+            margin-bottom: 8px;
+        }
+
+        .msg-user-title {
+            color: var(--cyan);
+        }
+
+        .msg-ai-title {
+            color: var(--green);
+        }
+
+        .markdown-body {
+            line-height: 1.65;
+            color: #e5e7eb;
+        }
+
+        .markdown-body h1,
+        .markdown-body h2,
+        .markdown-body h3 {
+            color: var(--green);
+            text-shadow: 0 0 8px rgba(0,255,156,0.20);
+            border-bottom: 1px solid rgba(0,255,156,0.14);
+            padding-bottom: 6px;
+        }
+
+        .markdown-body strong {
+            color: var(--cyan);
+        }
+
+        .markdown-body code {
+            color: var(--yellow);
+            background: rgba(253,224,71,0.08);
+            padding: 2px 6px;
+            border-radius: 6px;
+        }
+
+        .markdown-body pre {
+            background: #020617;
+            border: 1px solid rgba(0,217,255,0.18);
+            padding: 14px;
+            border-radius: 10px;
+            overflow-x: auto;
+        }
+
+        .markdown-body ul {
+            padding-left: 22px;
+        }
+
+        .markdown-body li {
+            margin-bottom: 6px;
+        }
+
+        .empty-state {
+            margin-top: 24px;
+            border: 1px dashed rgba(0,255,156,0.25);
+            border-radius: 14px;
+            padding: 22px;
+            color: var(--muted);
+            background: rgba(2, 6, 23, 0.55);
+        }
+
+        .footer {
+            margin-top: 22px;
+            padding-top: 16px;
+            border-top: 1px solid rgba(148,163,184,0.14);
+            color: var(--muted);
+            font-size: 13px;
+        }
+
+        .footer code {
+            color: var(--cyan);
+        }
+
+        @media (max-width: 980px) {
+            .page {
+                grid-template-columns: 1fr;
+            }
+
+            .main-actions {
+                flex-direction: column;
+            }
+
+            .main-actions button, .main-actions .btn {
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+
+<body>
+<canvas id="matrix"></canvas>
+
+<div class="page">
+    <aside class="sidebar">
+        <div class="terminal-header">
+            <div class="dots">
+                <span class="dot red"></span>
+                <span class="dot yellow"></span>
+                <span class="dot green-dot"></span>
+            </div>
+            <div class="terminal-title">SOC_MENU</div>
+        </div>
+
+        <div class="sidebar-content">
+            <div class="brand-title">
+                AI SOC<span class="cursor">_</span>
+            </div>
+
+            <div class="brand-subtitle">
+                Console interativo para análise de alertas Wazuh + Suricata + IA.
+            </div>
+            
+            <div class="status-card">
+                 <div class="status-label">Analista logado</div>
+                 <div class="status-value">{{ analista }}</div>
+            </div>
+
+            <div class="status-grid">
+                <div class="status-card">
+                    <div class="status-label">SIEM/XDR</div>
+                    <div class="status-value">Wazuh</div>
+                </div>
+                <div class="status-card">
+                    <div class="status-label">NDR/IDS</div>
+                    <div class="status-value">Suricata</div>
+                </div>
+                <div class="status-card">
+                    <div class="status-label">IA</div>
+                    <div class="status-value">OpenAI SOC Analyst</div>
+                </div>
+                <div class="status-card">
+                    <div class="status-label">Index</div>
+                    <div class="status-value">wazuh-alerts-*</div>
+                </div>
+            </div>
+
+<div class="menu-section" open>
+    <div class="section-title">Consultas rápidas</div>
+
+    <form method="POST">
+        <input type="hidden" name="pergunta" value="Resuma os últimos alertas do Wazuh em linguagem de analista SOC.">
+        <button type="submit">> resumo_alertas()</button>
+    </form>
+
+    <form method="POST">
+        <input type="hidden" name="pergunta" value="Houve sinais de brute force SSH? Informe evidências e recomendações.">
+        <button type="submit">> detectar_bruteforce()</button>
+    </form>
+
+    <form method="POST">
+        <input type="hidden" name="pergunta" value="Analise os alertas Suricata/NDR e destaque IPs de origem, destino, protocolos e assinaturas.">
+        <button type="submit">> analisar_ndr()</button>
+    </form>
+
+    <form method="POST">
+        <input type="hidden" name="pergunta" value="Houve eventos FIM? Explique arquivos alterados, risco e recomendações.">
+        <button type="submit">> analisar_fim()</button>
+    </form>
+
+    <form method="POST">
+        <input type="hidden" name="pergunta" value="Liste os eventos mais críticos e priorize a resposta do SOC.">
+        <button type="submit">> prioridade_soc()</button>
+    </form>
+</div>
+
+         <div class="menu-section">
+             <div class="section-title">Análises IA</div>
+
+             <a class="btn" href="/relatorio">> gerar_relatorio_soc()</a>
+             <a class="btn" href="/playbook">> gerar_playbook_incidente()</a>
+             <a class="btn" href="/correlacao">> correlacionar_incidente()</a>
+             <a class="btn" href="/sysmon">> analisar_sysmon()</a>
+         </div>
+
+         <details class="menu-section">
+             <summary>Downloads</summary>
+
+             <a class="btn" href="/download/relatorio">> baixar_relatorio_ia.md</a>
+             <a class="btn" href="/download/playbook">> baixar_playbook.md</a>
+             <a class="btn" href="/download/correlacao">> baixar_correlacao.md</a>
+             <a class="btn" href="/download/sysmon">> baixar_analise_sysmon.md</a>
+             <a class="btn" href="/download/alertas">> baixar_alertas.json</a>
+             <a class="btn" href="/download/historico">> baixar_historico_soc.db</a>
+        </details>
+
+        <div class="menu-section">
+            <div class="section-title">Sistema</div>
+                 <a class="btn" href="/sobre">> sobre_projeto()</a>
+                 <a class="btn" href="/historico">> visualizar_historico()</a>
+                 <a class="btn btn-danger" href="/limpar">> limpar_historico()</a>
+                 <a class="btn btn-danger" href="/logout">> logout()</a>
+            </div>
+
+            <div class="footer">
+                <strong>Status:</strong> Online<br>
+                <strong>Fonte:</strong> <code>wazuh-alerts-*</code><br>
+                <strong>Eventos:</strong> SSH, FIM, Suricata/NDR
+            </div>
+        </div>
+    </aside>
+
+    <main class="main">
+        <div class="terminal-header">
+            <div class="dots">
+                <span class="dot red"></span>
+                <span class="dot yellow"></span>
+                <span class="dot green-dot"></span>
+            </div>
+            <div class="terminal-title">AI_SOC_ASSISTANT :: SECURE_CONSOLE</div>
+        </div>
+
+        <div class="main-content">
+            <div class="brand-title brand-title-main">
+                Wazuh AI Console<span class="cursor">_</span>
+            </div>
+
+            <div class="subtitle">
+                Pergunte sobre alertas, IPs, brute force, eventos FIM, Suricata/NDR e recomendações de resposta.
+            </div>
+
+            <form method="POST" class="input-area">
+                <label class="prompt-label">
+                    <span class="prompt-prefix">root@soc-lab:~#</span> query_ai --context wazuh-alerts
+                </label>
+
+                <textarea name="pergunta" placeholder="Ex: Quais IPs estão mais suspeitos? Houve brute force? Gere um relatório executivo.">{{ pergunta }}</textarea>
+
+                <div class="main-actions">
+                    <button type="submit">[ EXECUTAR ]</button>
+                    <a class="btn" href="/relatorio">[ RELATÓRIO SOC ]</a>
+                </div>
+            </form>
+
+            {% if historico and historico|length > 0 %}
+                <div class="chat-window">
+                    {% for item in historico %}
+                        <div class="msg-header msg-user-title">
+                             [ {{ item.analista }} ] - {{ item.tipo }} - {{ item.data_hora }}
+                        </div>
+                        {{ item.pergunta }}
+                         
+                        <div class="message ai">
+                            <div class="msg-header msg-ai-title">[ IA SOC RESPONSE ]</div>
+                            <div class="markdown-body">
+                                {{ item.resposta_html|safe }}
+                            </div>
+                        </div>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <div class="empty-state">
+                    Nenhuma consulta realizada ainda. Use uma pergunta livre ou uma consulta rápida no menu lateral.
+                </div>
+            {% endif %}
+        </div>
+    </main>
+</div>
+
+<script>
+    const canvas = document.getElementById("matrix");
+    const ctx = canvas.getContext("2d");
+
+    function resizeMatrix() {
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+    }
+
+    resizeMatrix();
+    window.addEventListener("resize", resizeMatrix);
+
+    const chars = "01アイウエオカキクケコサシスセソABCDEFGHIJKLMNOPQRSTUVWXYZ$#@%&";
+    const fontSize = 14;
+    let columns = Math.floor(canvas.width / fontSize);
+    let drops = Array(columns).fill(1);
+
+    function resetDrops() {
+        columns = Math.floor(canvas.width / fontSize);
+        drops = Array(columns).fill(1);
+    }
+
+    window.addEventListener("resize", resetDrops);
+
+    function drawMatrix() {
+        ctx.fillStyle = "rgba(2, 6, 23, 0.12)";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        ctx.fillStyle = "#00ff9c";
+        ctx.font = fontSize + "px monospace";
+
+        for (let i = 0; i < drops.length; i++) {
+            const text = chars.charAt(Math.floor(Math.random() * chars.length));
+            ctx.fillText(text, i * fontSize, drops[i] * fontSize);
+
+            if (drops[i] * fontSize > canvas.height && Math.random() > 0.975) {
+                drops[i] = 0;
+            }
+
+            drops[i]++;
+        }
+    }
+
+    setInterval(drawMatrix, 45);
+</script>
+</body>
+</html>

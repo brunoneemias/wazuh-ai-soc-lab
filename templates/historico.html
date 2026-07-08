@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <title>Histórico SOC - AI Assistant</title>
+    <style>
+        :root {
+            --bg: #020617;
+            --panel: rgba(3, 7, 18, 0.92);
+            --border: rgba(0, 255, 156, 0.22);
+            --green: #00ff9c;
+            --cyan: #00d9ff;
+            --text: #d1fae5;
+            --muted: #94a3b8;
+            --danger: #fb7185;
+            --yellow: #fde047;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            background:
+                radial-gradient(circle at top left, rgba(0,217,255,0.10), transparent 25%),
+                radial-gradient(circle at bottom right, rgba(0,255,156,0.08), transparent 25%),
+                #020617;
+            color: var(--text);
+            font-family: Consolas, "Courier New", monospace;
+            min-height: 100vh;
+            padding: 24px;
+        }
+
+        .container {
+            max-width: 1300px;
+            margin: 0 auto;
+            background: var(--panel);
+            border: 1px solid var(--border);
+            border-radius: 18px;
+            overflow: hidden;
+            box-shadow:
+                0 0 30px rgba(0,0,0,0.55),
+                0 0 18px rgba(0,255,156,0.10);
+        }
+
+        .header {
+            padding: 18px 22px;
+            border-bottom: 1px solid rgba(0,255,156,0.14);
+            background: linear-gradient(90deg, rgba(0,255,156,0.09), rgba(0,217,255,0.07));
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .title {
+            color: var(--green);
+            font-size: 24px;
+            font-weight: bold;
+            text-shadow: 0 0 10px rgba(0,255,156,0.35);
+        }
+
+        .title::before {
+            content: ">";
+            color: var(--cyan);
+            margin-right: 8px;
+        }
+
+        .actions a {
+            color: var(--green);
+            border: 1px solid rgba(0,255,156,0.28);
+            padding: 10px 14px;
+            border-radius: 10px;
+            text-decoration: none;
+            margin-left: 8px;
+            display: inline-block;
+        }
+
+        .actions a:hover {
+            color: var(--cyan);
+            border-color: var(--cyan);
+        }
+
+        .content {
+            padding: 22px;
+        }
+
+        .subtitle {
+            color: var(--muted);
+            margin-bottom: 20px;
+            line-height: 1.5;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            overflow: hidden;
+            border-radius: 12px;
+        }
+
+        th, td {
+            border-bottom: 1px solid rgba(148,163,184,0.16);
+            padding: 12px;
+            vertical-align: top;
+            text-align: left;
+        }
+
+        th {
+            color: var(--cyan);
+            background: rgba(2,6,23,0.72);
+            font-size: 13px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        td {
+            color: #e5e7eb;
+            font-size: 14px;
+        }
+
+        .tipo {
+            color: var(--yellow);
+            font-weight: bold;
+        }
+
+        .pergunta {
+            color: var(--text);
+            max-width: 420px;
+        }
+
+        details {
+            background: rgba(2, 6, 23, 0.65);
+            border: 1px solid rgba(0,255,156,0.14);
+            border-radius: 10px;
+            padding: 10px;
+        }
+
+        summary {
+            cursor: pointer;
+            color: var(--green);
+            font-weight: bold;
+        }
+
+        .resposta {
+            margin-top: 12px;
+            line-height: 1.6;
+            white-space: pre-wrap;
+            color: #e5e7eb;
+        }
+
+        .empty {
+            border: 1px dashed rgba(0,255,156,0.25);
+            border-radius: 14px;
+            padding: 22px;
+            color: var(--muted);
+            background: rgba(2, 6, 23, 0.55);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="title">Histórico SOC </div>
+
+            <div class="actions">
+                <a href="/">Voltar ao Chat</a>
+                <a href="/download/historico">Baixar DB</a>
+                <a href="/limpar">Limpar Histórico</a>
+                <a href="/logout">Logout</a>
+            </div>
+        </div>
+
+        <div class="content">
+            <div class="subtitle">
+                 Registro persistente das consultas realizadas no AI SOC Assistant.<br>
+                 Analista logado: <strong>{{ analista }}</strong><br>
+                 Esses dados são salvos no SQLite em <strong>historico_soc.db</strong>.
+            </div>
+
+            {% if historico and historico|length > 0 %}
+                <table>
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Data/Hora</th>
+                            <th>Analista</th>
+                            <th>Tipo</th>
+                            <th>Pergunta</th>
+                            <th>Resposta</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in historico %}
+                        <tr>
+                            <td>{{ item.id }}</td>
+                            <td>{{ item.data_hora }}</td>
+                            <td>{{ item.analista }}</td>
+                            <td class="tipo">{{ item.tipo }}</td>
+                            <td class="pergunta">{{ item.pergunta }}</td>
+                            <td>
+                                <details>
+                                    <summary>Ver resposta</summary>
+                                    <div class="resposta">{{ item.resposta }}</div>
+                                </details>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            {% else %}
+                <div class="empty">
+                    Nenhum registro encontrado no histórico.
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</body>
+</html>
