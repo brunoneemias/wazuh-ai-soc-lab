@@ -265,6 +265,52 @@ Alertas recentes:
 
     return response.output_text
 
+# =========================
+# IA - RELATÓRIO EXECUTIVO
+# =========================
+
+def gerar_relatorio_executivo_ia(eventos):
+    prompt = f"""
+Você é um analista de segurança traduzindo um relatório técnico de SOC para um relatório
+executivo, destinado a um gestor ou cliente não técnico (ex: dono de empresa, diretor, CEO).
+
+Regras obrigatórias:
+- NÃO use jargão técnico (nada de "MITRE ATT&CK", "syscheck", "IOC", "rule.id", etc.).
+- NÃO inclua tabelas técnicas nem IDs de técnica.
+- Traduza severidade técnica em impacto de negócio (ex: "risco de indisponibilidade",
+  "possível exposição de dados", "tentativa de acesso não autorizado").
+- Foque em: o que aconteceu, qual o risco pro negócio, o que já foi feito, o que precisa
+  de decisão/ação do gestor.
+- Seja direto e objetivo. Gestores têm pouco tempo.
+- Responda em português brasileiro, em Markdown simples (títulos e listas, sem tabelas).
+- Não invente informação que não exista nos alertas.
+- Se não houver eventos relevantes, diga isso claramente e tranquilize o leitor.
+
+Estrutura obrigatória da resposta:
+
+## Resumo Executivo
+(2-3 frases, o essencial pra quem só vai ler isso)
+
+## O que foi observado
+(linguagem de negócio, sem termos técnicos)
+
+## Nível de risco
+(Baixo / Médio / Alto / Crítico + 1 frase explicando por quê, em termos de impacto)
+
+## Ações recomendadas
+(lista curta, priorizada, do que precisa de decisão do gestor)
+
+Alertas recentes (uso interno, não citar termos técnicos deles na resposta):
+{json.dumps(eventos, indent=2, ensure_ascii=False)}
+"""
+
+    response = client.responses.create(
+        model=OPENAI_MODEL,
+        input=prompt
+    )
+
+    return response.output_text
+
 
 # =========================
 # IA - PLAYBOOK
@@ -1020,6 +1066,54 @@ def relatorio():
             analista=obter_analista_logado()
         )
 
+@app.route("/relatorio-executivo", methods=["GET"])
+def relatorio_executivo():
+    bloqueio = proteger_rota()
+    if bloqueio:
+        return bloqueio
+
+    pergunta = "Gerar relatório executivo (linguagem de negócio) dos alertas recentes."
+
+    try:
+        eventos = coletar_alertas(limite=40)
+        resposta = gerar_relatorio_executivo_ia(eventos)
+        resposta_html = markdown_to_html(resposta)
+
+        salvar_markdown("relatorio_executivo.md", resposta)
+        salvar_historico_db("relatorio_executivo", pergunta, resposta, obter_analista_logado())
+
+        historico_tela = [{
+            "id": None,
+            "data_hora": "",
+            "tipo": "relatorio_executivo",
+            "pergunta": pergunta,
+            "resposta": resposta,
+            "resposta_html": resposta_html,
+            "analista": obter_analista_logado()
+        }]
+
+        return render_template(
+            "index.html",
+            resposta=resposta,
+            resposta_html=resposta_html,
+            pergunta=pergunta,
+            historico=historico_tela,
+            analista=obter_analista_logado()
+        )
+
+    except Exception as e:
+        resposta = f"Erro: {e}"
+        resposta_html = f"<p><strong>Erro:</strong> {e}</p>"
+
+        return render_template(
+            "index.html",
+            resposta=resposta,
+            resposta_html=resposta_html,
+            pergunta="",
+            historico=[],
+            analista=obter_analista_logado()
+        )
+
 @app.route("/playbook", methods=["GET"])
 def playbook():
     bloqueio = proteger_rota()
@@ -1134,6 +1228,7 @@ def download(tipo):
 
     arquivos = {
         "relatorio": os.path.join(OUTPUT_DIR, "relatorio_ia_soc.md"),
+        "executivo": os.path.join(OUTPUT_DIR, "relatorio_executivo.md"),
         "playbook": os.path.join(OUTPUT_DIR, "playbook_incidente.md"),
         "correlacao": os.path.join(OUTPUT_DIR, "correlacao_soc.md"),
         "sysmon": os.path.join(OUTPUT_DIR, "analise_sysmon.md"),
