@@ -652,23 +652,29 @@ Essa página é útil para apresentação e demonstração do projeto.
 ```text
 wazuh-ai-soc-lab/
 ├── app.py
-├── coletar_alertas.py
-├── gerar_relatorio.py
-├── analisar_com_ia.py
-├── executar_analise_soc.py
 ├── requirements.txt
 ├── .env.example
 ├── .gitignore
 ├── README.md
-├── historico_soc.db
+├── data/
+│   └── historico_soc.db
+├── output/
+│   ├── alertas_wazuh.json
+│   ├── relatorio_soc.md
+│   ├── relatorio_ia_soc.md
+│   ├── playbook_incidente.md
+│   ├── correlacao_soc.md
+│   └── analise_sysmon.md
 ├── templates/
 │   ├── index.html
 │   ├── login.html
 │   ├── historico.html
 │   └── sobre.html
-├── scripts/
-│   ├── demo_eventos_kali.sh
-│   └── demo_eventos_windows.ps1
+├── legacy_cli/
+│   ├── coletar_alertas.py
+│   ├── gerar_relatorio.py
+│   ├── analisar_com_ia.py
+│   └── executar_analise_soc.py
 ├── evidencias/
 │   ├── alertas_wazuh.json
 │   ├── relatorio_soc.md
@@ -689,7 +695,9 @@ wazuh-ai-soc-lab/
     └── 10_downloads.png
 ```
 
-> Observação: `historico_soc.db`, `.env` e arquivos de evidência sensíveis devem ficar no `.gitignore` e não devem ser publicados no GitHub.
+> Observação: data/, output/, .env e evidências sensíveis ficam no .gitignore e não devem ser publicados com dados reais.
+
+> app.py é a aplicação Flask atual, autossuficiente. legacy_cli/ guarda a primeira versão do projeto (pipeline via linha de comando), mantida como registro da evolução do laboratório.
 
 ---
 
@@ -740,14 +748,11 @@ venv/
 __pycache__/
 *.pyc
 *.log
+*.bkp
+*.zip
 
-historico_soc.db
-alertas_wazuh.json
-relatorio_soc.md
-relatorio_ia_soc.md
-playbook_incidente.md
-correlacao_soc.md
-analise_sysmon.md
+data/
+output/
 
 .DS_Store
 ```
@@ -1019,9 +1024,11 @@ Recomendações:
 
 ## 👨‍💻 Autor
 
-**Bruno Neemias **
+**Bruno Neemias**
 
 Projeto desenvolvido como laboratório acadêmico e prático de segurança defensiva, com foco em SIEM, SOC, NDR, XDR, Sysmon, Active Response e Inteligência Artificial aplicada à análise de alertas.
+
+[LinkedIn](https://linkedin.com/in/brunoneemias) [GitHub](https://github.com/brunoneemias)
 ---
 
 ## 🏁 Conclusão
