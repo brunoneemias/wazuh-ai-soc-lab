@@ -34,6 +34,18 @@ OUTPUT_DIR = os.path.join(BASE_DIR, "output")
 os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
+# =========================
+# MULTI-TENANT (SIMULADO)
+# =========================
+# Mapeia o nome do agente Wazuh pro "cliente" que ele representa numa
+# operação SOCaaS. Troque os nomes à vontade — é só rótulo de exibição,
+# não muda nada na coleta real dos alertas.
+CLIENTES_MAP = {
+    "Windows_11": "Cliente A - TechCorp Solutions",
+    "kali": "Cliente B - Comercio Silva ME",
+}
+CLIENTE_PADRAO = "Nao classificado"
+
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 requests.packages.urllib3.disable_warnings()
@@ -161,6 +173,7 @@ def coletar_alertas(limite=30):
             "timestamp": src.get("timestamp"),
             "agent": agent.get("name"),
             "agent_ip": agent.get("ip"),
+            "cliente": CLIENTES_MAP.get(agent.get("name"), CLIENTE_PADRAO),
             "rule_id": rule.get("id"),
             "level": rule.get("level"),
             "description": rule.get("description"),
@@ -209,6 +222,50 @@ def coletar_alertas(limite=30):
 # =========================
 # IA - PERGUNTA LIVRE
 # =========================
+
+# =========================
+# ESTATÍSTICAS POR CLIENTE (MULTI-TENANT)
+# =========================
+
+def estatisticas_por_cliente(eventos):
+    stats = {}
+
+    for e in eventos:
+        cliente = e.get("cliente", CLIENTE_PADRAO)
+
+        if cliente not in stats:
+            stats[cliente] = {
+                "cliente": cliente,
+                "total": 0,
+                "criticos": 0,
+                "altos": 0,
+                "medios": 0,
+                "baixos": 0,
+                "ultimo_alerta": None,
+            }
+
+        registro = stats[cliente]
+        registro["total"] += 1
+
+        try:
+            level = int(e.get("level") or 0)
+        except (TypeError, ValueError):
+            level = 0
+
+        if level >= 11:
+            registro["criticos"] += 1
+        elif level >= 7:
+            registro["altos"] += 1
+        elif level >= 4:
+            registro["medios"] += 1
+        else:
+            registro["baixos"] += 1
+
+        ts = e.get("timestamp")
+        if ts and (registro["ultimo_alerta"] is None or ts > registro["ultimo_alerta"]):
+            registro["ultimo_alerta"] = ts
+
+    return sorted(stats.values(), key=lambda r: r["total"], reverse=True)
 
 def perguntar_ia(pergunta, eventos):
     prompt = f"""
@@ -1314,6 +1371,24 @@ def historico():
     return render_template(
         "historico.html",
         historico=registros,
+        analista=obter_analista_logado()
+    )
+
+@app.route("/clientes", methods=["GET"])
+def clientes():
+    bloqueio = proteger_rota()
+    if bloqueio:
+        return bloqueio
+
+    try:
+        eventos = coletar_alertas(limite=100)
+        stats = estatisticas_por_cliente(eventos)
+    except Exception as e:
+        stats = []
+
+    return render_template(
+        "clientes.html",
+        clientes=stats,
         analista=obter_analista_logado()
     )
 

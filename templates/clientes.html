@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <title>Clientes - AI SOC Assistant</title>
+    <style>
+        :root {
+            --bg: #020617;
+            --panel: rgba(3, 7, 18, 0.92);
+            --border: rgba(0, 255, 156, 0.22);
+            --green: #00ff9c;
+            --cyan: #00d9ff;
+            --text: #d1fae5;
+            --muted: #94a3b8;
+            --danger: #fb7185;
+            --yellow: #fde047;
+            --purple: #a78bfa;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            background:
+                radial-gradient(circle at top left, rgba(0,217,255,0.10), transparent 25%),
+                radial-gradient(circle at bottom right, rgba(0,255,156,0.08), transparent 25%),
+                #020617;
+            color: var(--text);
+            font-family: Consolas, "Courier New", monospace;
+            min-height: 100vh;
+            padding: 24px;
+        }
+
+        .container {
+            max-width: 1300px;
+            margin: 0 auto;
+            background: var(--panel);
+            border: 1px solid var(--border);
+            border-radius: 18px;
+            overflow: hidden;
+            box-shadow:
+                0 0 30px rgba(0,0,0,0.55),
+                0 0 18px rgba(0,255,156,0.10);
+        }
+
+        .header {
+            padding: 18px 22px;
+            border-bottom: 1px solid rgba(0,255,156,0.14);
+            background: linear-gradient(90deg, rgba(0,255,156,0.09), rgba(0,217,255,0.07));
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .title {
+            color: var(--green);
+            font-size: 24px;
+            font-weight: bold;
+            text-shadow: 0 0 10px rgba(0,255,156,0.35);
+        }
+
+        .title::before {
+            content: ">";
+            color: var(--cyan);
+            margin-right: 8px;
+        }
+
+        .actions a {
+            color: var(--green);
+            border: 1px solid rgba(0,255,156,0.28);
+            padding: 10px 14px;
+            border-radius: 10px;
+            text-decoration: none;
+            margin-left: 8px;
+            display: inline-block;
+        }
+
+        .actions a:hover {
+            color: var(--cyan);
+            border-color: var(--cyan);
+        }
+
+        .content {
+            padding: 22px;
+        }
+
+        .subtitle {
+            color: var(--muted);
+            margin-bottom: 20px;
+            line-height: 1.5;
+        }
+
+        .cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+
+        .client-card {
+            background: rgba(2, 6, 23, 0.72);
+            border: 1px solid rgba(0,217,255,0.16);
+            border-radius: 14px;
+            padding: 18px;
+        }
+
+        .client-name {
+            color: var(--cyan);
+            font-size: 16px;
+            font-weight: bold;
+            margin-bottom: 12px;
+            text-shadow: 0 0 8px rgba(0,217,255,0.30);
+        }
+
+        .client-name::before {
+            content: "> ";
+            color: var(--green);
+        }
+
+        .badge-row {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            margin-bottom: 10px;
+        }
+
+        .badge {
+            font-size: 11px;
+            padding: 4px 9px;
+            border-radius: 20px;
+            font-weight: bold;
+            border: 1px solid transparent;
+        }
+
+        .badge-total {
+            color: var(--muted);
+            border-color: rgba(148,163,184,0.28);
+        }
+
+        .badge-critico {
+            color: var(--danger);
+            border-color: rgba(251,113,133,0.35);
+            background: rgba(251,113,133,0.08);
+        }
+
+        .badge-alto {
+            color: var(--yellow);
+            border-color: rgba(253,224,71,0.35);
+            background: rgba(253,224,71,0.08);
+        }
+
+        .badge-medio {
+            color: var(--cyan);
+            border-color: rgba(0,217,255,0.30);
+            background: rgba(0,217,255,0.06);
+        }
+
+        .badge-baixo {
+            color: var(--green);
+            border-color: rgba(0,255,156,0.30);
+            background: rgba(0,255,156,0.06);
+        }
+
+        .ultimo {
+            color: var(--muted);
+            font-size: 12px;
+            margin-top: 6px;
+        }
+
+        .ultimo strong {
+            color: var(--text);
+        }
+
+        .empty {
+            border: 1px dashed rgba(0,255,156,0.25);
+            border-radius: 14px;
+            padding: 22px;
+            color: var(--muted);
+            background: rgba(2, 6, 23, 0.55);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="title">Clientes Monitorados</div>
+
+            <div class="actions">
+                <a href="/">Voltar ao Chat</a>
+                <a href="/historico">Historico</a>
+                <a href="/logout">Logout</a>
+            </div>
+        </div>
+
+        <div class="content">
+            <div class="subtitle">
+                Visao consolidada por cliente (multi-tenant simulado), baseada nos agentes
+                Wazuh conectados.<br>
+                Analista logado: <strong>{{ analista }}</strong>
+            </div>
+
+            {% if clientes and clientes|length > 0 %}
+                <div class="cards">
+                    {% for c in clientes %}
+                        <div class="client-card">
+                            <div class="client-name">{{ c.cliente }}</div>
+
+                            <div class="badge-row">
+                                <span class="badge badge-total">{{ c.total }} eventos</span>
+                                {% if c.criticos > 0 %}
+                                    <span class="badge badge-critico">{{ c.criticos }} critico(s)</span>
+                                {% endif %}
+                                {% if c.altos > 0 %}
+                                    <span class="badge badge-alto">{{ c.altos }} alto(s)</span>
+                                {% endif %}
+                                {% if c.medios > 0 %}
+                                    <span class="badge badge-medio">{{ c.medios }} medio(s)</span>
+                                {% endif %}
+                                {% if c.baixos > 0 %}
+                                    <span class="badge badge-baixo">{{ c.baixos }} baixo(s)</span>
+                                {% endif %}
+                            </div>
+
+                            <div class="ultimo">
+                                Ultimo alerta: <strong>{{ c.ultimo_alerta or "sem registro" }}</strong>
+                            </div>
+                        </div>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <div class="empty">
+                    Nenhum evento encontrado para classificar por cliente ainda.
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</body>
+</html>
