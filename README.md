@@ -385,6 +385,39 @@ Filtro principal:
 data.win.system.channel: "Microsoft-Windows-Sysmon/Operational"
 ```
 
+### 10. Multi-Tenant Simulado (Clientes)
+
+Para se aproximar do modelo de operação de uma SOCaaS (Security Operations Center as a Service), o projeto simula múltiplos clientes a partir dos agentes Wazuh conectados — cada agente representa uma organização diferente sendo monitorada.
+
+A interface exibe, por cliente:
+
+- Total de eventos coletados;
+- Distribuição por severidade (crítico, alto, médio, baixo);
+- Data/hora do último alerta.
+
+Isso demonstra como um único ambiente Wazuh pode ser adaptado para operar múltiplos clientes de forma segregada visualmente, um requisito central de qualquer produto SOCaaS.
+
+### 11. Relatório Executivo com IA
+
+Além do relatório técnico (com MITRE ATT&CK, IOCs e termos de SOC), o projeto gera uma versão do relatório em **linguagem de negócio**, voltada para gestores e clientes não técnicos.
+
+O relatório executivo:
+
+- Traduz severidade técnica em impacto de negócio;
+- Remove jargão técnico e tabelas técnicas;
+- Apresenta nível de risco e ações recomendadas de forma objetiva.
+
+Essa dualidade (relatório técnico + relatório executivo) reflete como uma operação SOCaaS real precisa comunicar o mesmo incidente de formas diferentes, dependendo do público.
+
+### 12. Painel de SLA Simulado (TTD/TTR)
+
+O projeto calcula duas métricas operacionais a partir de timestamps reais registrados no histórico:
+
+- **TTD (Tempo de Detecção):** intervalo entre o alerta mais recente do lote e o momento em que a IA gerou a análise;
+- **TTR (Tempo de Resposta):** intervalo entre a última análise de um cliente e o playbook de resposta gerado em seguida.
+
+Essas métricas são exibidas por cliente, simulando o tipo de SLA que uma operação SOCaaS real acompanha e reporta para seus clientes.
+
 ---
 
 ### 9. Aplicação Web com IA — AI SOC Assistant
@@ -423,6 +456,9 @@ Funções disponíveis no menu:
 > gerar_playbook_incidente()
 > correlacionar_incidente()
 > analisar_sysmon()
+> gerar_relatorio_executivo()
+> visualizar_clientes()
+> visualizar_sla()
 > sobre_projeto()
 > visualizar_historico()
 > baixar_relatorio_ia.md
@@ -967,6 +1003,9 @@ Detectar → Correlacionar → Analisar com IA → Mapear MITRE → Gerar Playbo
 - ✅ Mapeamento MITRE ATT&CK
 - ✅ Exportação de evidências
 - ✅ Scripts de demonstração para Linux e Windows
+- ✅ Multi-tenant simulado (visão por cliente)
+- ✅ Relatório executivo em linguagem de negócio
+- ✅ Painel de SLA simulado (TTD/TTR) por cliente
 
 ---
 
