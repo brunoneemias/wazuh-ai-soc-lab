@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <title>SLA SOC - AI Assistant</title>
+    <style>
+        :root {
+            --bg: #020617;
+            --panel: rgba(3, 7, 18, 0.92);
+            --border: rgba(0, 255, 156, 0.22);
+            --green: #00ff9c;
+            --cyan: #00d9ff;
+            --text: #d1fae5;
+            --muted: #94a3b8;
+            --danger: #fb7185;
+            --yellow: #fde047;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            background:
+                radial-gradient(circle at top left, rgba(0,217,255,0.10), transparent 25%),
+                radial-gradient(circle at bottom right, rgba(0,255,156,0.08), transparent 25%),
+                #020617;
+            color: var(--text);
+            font-family: Consolas, "Courier New", monospace;
+            min-height: 100vh;
+            padding: 24px;
+        }
+
+        .container {
+            max-width: 1300px;
+            margin: 0 auto;
+            background: var(--panel);
+            border: 1px solid var(--border);
+            border-radius: 18px;
+            overflow: hidden;
+            box-shadow:
+                0 0 30px rgba(0,0,0,0.55),
+                0 0 18px rgba(0,255,156,0.10);
+        }
+
+        .header {
+            padding: 18px 22px;
+            border-bottom: 1px solid rgba(0,255,156,0.14);
+            background: linear-gradient(90deg, rgba(0,255,156,0.09), rgba(0,217,255,0.07));
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .title {
+            color: var(--green);
+            font-size: 24px;
+            font-weight: bold;
+            text-shadow: 0 0 10px rgba(0,255,156,0.35);
+        }
+
+        .title::before {
+            content: ">";
+            color: var(--cyan);
+            margin-right: 8px;
+        }
+
+        .actions a {
+            color: var(--green);
+            border: 1px solid rgba(0,255,156,0.28);
+            padding: 10px 14px;
+            border-radius: 10px;
+            text-decoration: none;
+            margin-left: 8px;
+            display: inline-block;
+        }
+
+        .actions a:hover {
+            color: var(--cyan);
+            border-color: var(--cyan);
+        }
+
+        .content {
+            padding: 22px;
+        }
+
+        .subtitle {
+            color: var(--muted);
+            margin-bottom: 8px;
+            line-height: 1.5;
+        }
+
+        .metodologia {
+            border: 1px dashed rgba(0,217,255,0.30);
+            border-radius: 12px;
+            padding: 14px 16px;
+            color: var(--muted);
+            font-size: 13px;
+            line-height: 1.6;
+            margin-bottom: 22px;
+            background: rgba(2, 6, 23, 0.5);
+        }
+
+        .metodologia strong {
+            color: var(--cyan);
+        }
+
+        .cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 16px;
+        }
+
+        .client-card {
+            background: rgba(2, 6, 23, 0.72);
+            border: 1px solid rgba(0,217,255,0.16);
+            border-radius: 14px;
+            padding: 18px;
+        }
+
+        .client-name {
+            color: var(--cyan);
+            font-size: 16px;
+            font-weight: bold;
+            margin-bottom: 14px;
+            text-shadow: 0 0 8px rgba(0,217,255,0.30);
+        }
+
+        .client-name::before {
+            content: "> ";
+            color: var(--green);
+        }
+
+        .metric {
+            display: flex;
+            justify-content: space-between;
+            align-items: baseline;
+            padding: 10px 0;
+            border-bottom: 1px solid rgba(148,163,184,0.14);
+        }
+
+        .metric:last-child {
+            border-bottom: none;
+        }
+
+        .metric-label {
+            color: var(--muted);
+            font-size: 13px;
+        }
+
+        .metric-value {
+            font-size: 20px;
+            font-weight: bold;
+            color: var(--green);
+        }
+
+        .metric-value.sem-dado {
+            color: var(--muted);
+            font-size: 13px;
+            font-weight: normal;
+        }
+
+        .metric-sub {
+            color: var(--muted);
+            font-size: 11px;
+        }
+
+        .empty {
+            border: 1px dashed rgba(0,255,156,0.25);
+            border-radius: 14px;
+            padding: 22px;
+            color: var(--muted);
+            background: rgba(2, 6, 23, 0.55);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="title">SLA Simulado - Deteccao e Resposta</div>
+
+            <div class="actions">
+                <a href="/">Voltar ao Chat</a>
+                <a href="/clientes">Clientes</a>
+                <a href="/logout">Logout</a>
+            </div>
+        </div>
+
+        <div class="content">
+            <div class="subtitle">
+                Metricas calculadas a partir dos timestamps reais do historico de analises.<br>
+                Analista logado: <strong>{{ analista }}</strong>
+            </div>
+
+            <div class="metodologia">
+                <strong>Metodologia:</strong> Tempo de Deteccao (TTD) = intervalo entre o alerta
+                mais recente do lote analisado e o momento em que a IA gerou a analise.
+                Tempo de Resposta (TTR) = intervalo entre a ultima analise de um cliente e o
+                playbook de resposta gerado em seguida para esse mesmo cliente. Sao metricas
+                simuladas de laboratorio, nao um SLA contratual de producao.
+            </div>
+
+            {% if clientes and clientes|length > 0 %}
+                <div class="cards">
+                    {% for c in clientes %}
+                        <div class="client-card">
+                            <div class="client-name">{{ c.cliente }}</div>
+
+                            <div class="metric">
+                                <span class="metric-label">Tempo de Deteccao (TTD)</span>
+                                {% if c.ttd_medio_min is not none %}
+                                    <span class="metric-value">{{ c.ttd_medio_min }} min</span>
+                                {% else %}
+                                    <span class="metric-value sem-dado">sem dados ainda</span>
+                                {% endif %}
+                            </div>
+                            <div class="metric-sub">{{ c.ttd_amostras }} amostra(s)</div>
+
+                            <div class="metric">
+                                <span class="metric-label">Tempo de Resposta (TTR)</span>
+                                {% if c.ttr_medio_min is not none %}
+                                    <span class="metric-value">{{ c.ttr_medio_min }} min</span>
+                                {% else %}
+                                    <span class="metric-value sem-dado">sem dados ainda</span>
+                                {% endif %}
+                            </div>
+                            <div class="metric-sub">{{ c.ttr_amostras }} amostra(s)</div>
+                        </div>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <div class="empty">
+                    Ainda nao ha analises suficientes no historico para calcular o SLA.
+                    Gere um relatorio e um playbook pra comecar a popular essa tela.
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</body>
+</html>

@@ -224,6 +224,29 @@ def coletar_alertas(limite=30):
 # =========================
 
 # =========================
+# HELPER - RESUMO DE LOTE (pra SLA e multi-tenant)
+# =========================
+
+def resumo_lote(eventos):
+    """Retorna (cliente_predominante, timestamp_do_alerta_mais_recente) de um lote de eventos."""
+    if not eventos:
+        return CLIENTE_PADRAO, None
+
+    contagem = {}
+    mais_recente = None
+
+    for e in eventos:
+        c = e.get("cliente", CLIENTE_PADRAO)
+        contagem[c] = contagem.get(c, 0) + 1
+
+        ts = e.get("timestamp")
+        if ts and (mais_recente is None or ts > mais_recente):
+            mais_recente = ts
+
+    cliente_predominante = max(contagem, key=contagem.get)
+    return cliente_predominante, mais_recente
+
+# =========================
 # ESTATÍSTICAS POR CLIENTE (MULTI-TENANT)
 # =========================
 
@@ -912,22 +935,33 @@ def inicializar_banco():
     if "analista" not in colunas:
         cursor.execute("ALTER TABLE historico ADD COLUMN analista TEXT DEFAULT 'Analista SOC'")
 
+    if "analista" not in colunas:
+        cursor.execute("ALTER TABLE historico ADD COLUMN analista TEXT DEFAULT 'Analista SOC'")
+
+    if "cliente" not in colunas:
+        cursor.execute("ALTER TABLE historico ADD COLUMN cliente TEXT")
+
+    if "alerta_recente" not in colunas:
+        cursor.execute("ALTER TABLE historico ADD COLUMN alerta_recente TEXT")
+
     conexao.commit()
     conexao.close()
 
-def salvar_historico_db(tipo, pergunta, resposta, analista="Analista SOC"):
+def salvar_historico_db(tipo, pergunta, resposta, analista="Analista SOC", cliente=None, alerta_recente=None):
     conexao = sqlite3.connect(DB_PATH)
     cursor = conexao.cursor()
 
     cursor.execute("""
-        INSERT INTO historico (data_hora, tipo, pergunta, resposta, analista)
-        VALUES (?, ?, ?, ?, ?)
+        INSERT INTO historico (data_hora, tipo, pergunta, resposta, analista, cliente, alerta_recente)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
     """, (
         datetime.now().strftime("%d/%m/%Y %H:%M:%S"),
         tipo,
         pergunta,
         resposta,
-        analista
+        analista,
+        cliente,
+        alerta_recente
     ))
 
     conexao.commit()
@@ -1030,11 +1064,14 @@ def index():
                 resposta_html = markdown_to_html(resposta)
 
                 salvar_markdown("relatorio_ia_soc.md", resposta)
+                cliente_lote, alerta_recente_lote = resumo_lote(eventos)
                 salvar_historico_db(
                     "pergunta_livre",
                     pergunta,
                     resposta,
-                    obter_analista_logado()
+                    obter_analista_logado(),
+                    cliente_lote,
+                    alerta_recente_lote
                 )
 
                 historico_tela = [{
@@ -1089,8 +1126,9 @@ def relatorio():
         resposta_html = markdown_to_html(resposta)
 
         salvar_markdown("relatorio_ia_soc.md", resposta)
-        salvar_historico_db("relatorio_soc", pergunta, resposta, obter_analista_logado())
-
+        cliente_lote, alerta_recente_lote = resumo_lote(eventos)
+        salvar_historico_db("relatorio_soc", pergunta, resposta, obter_analista_logado(), cliente_lote, alerta_recente_lote)
+       
         historico_tela = [{
             "id": None,
             "data_hora": "",
@@ -1137,8 +1175,9 @@ def relatorio_executivo():
         resposta_html = markdown_to_html(resposta)
 
         salvar_markdown("relatorio_executivo.md", resposta)
-        salvar_historico_db("relatorio_executivo", pergunta, resposta, obter_analista_logado())
-
+        cliente_lote, alerta_recente_lote = resumo_lote(eventos)
+        salvar_historico_db("relatorio_executivo", pergunta, resposta, obter_analista_logado(), cliente_lote, alerta_recente_lote)       
+ 
         historico_tela = [{
             "id": None,
             "data_hora": "",
@@ -1185,7 +1224,8 @@ def playbook():
         resposta_html = markdown_to_html(resposta)
 
         salvar_markdown("playbook_incidente.md", resposta)
-        salvar_historico_db("pergunta_livre", pergunta, resposta, obter_analista_logado())
+        cliente_lote, alerta_recente_lote = resumo_lote(eventos)
+        salvar_historico_db("playbook", pergunta, resposta, obter_analista_logado(), cliente_lote, alerta_recente_lote)
 
         historico_tela = [{
             "id": None,
@@ -1236,7 +1276,8 @@ def correlacao():
         resposta_html = markdown_to_html(resposta)
 
         salvar_markdown("correlacao_soc.md", resposta)
-        salvar_historico_db("pergunta_livre", pergunta, resposta, obter_analista_logado())        
+        cliente_lote, alerta_recente_lote = resumo_lote(eventos)
+        salvar_historico_db("correlacao", pergunta, resposta, obter_analista_logado(), cliente_lote, alerta_recente_lote)
 
         historico_tela = [{
             "id": None,
@@ -1314,7 +1355,8 @@ def sysmon():
         resposta_html = markdown_to_html(resposta)
 
         salvar_markdown("analise_sysmon.md", resposta)
-        salvar_historico_db("sysmon", pergunta, resposta, obter_analista_logado())
+        cliente_lote, alerta_recente_lote = resumo_lote(eventos)
+        salvar_historico_db("sysmon", pergunta, resposta, obter_analista_logado(), cliente_lote, alerta_recente_lote)
         
         historico_tela = [{
             "id": None,
@@ -1389,6 +1431,101 @@ def clientes():
     return render_template(
         "clientes.html",
         clientes=stats,
+        analista=obter_analista_logado()
+    )
+
+def _parse_data_hora(data_hora_str):
+    return datetime.strptime(data_hora_str, "%d/%m/%Y %H:%M:%S")
+
+
+def _parse_alerta_ts(ts_str):
+    if not ts_str:
+        return None
+    try:
+        ts_norm = ts_str
+        if len(ts_norm) >= 5 and ts_norm[-5] in "+-" and ts_norm[-3] != ":":
+            ts_norm = ts_norm[:-2] + ":" + ts_norm[-2:]
+        dt = datetime.fromisoformat(ts_norm)
+        return dt.replace(tzinfo=None)
+    except Exception:
+        return None
+
+
+def calcular_sla():
+    """
+    Calcula, por cliente:
+    - TTD (tempo de deteccao): tempo entre o alerta mais recente do lote e a analise da IA
+    - TTR (tempo de resposta): tempo entre a ultima analise de um cliente e o playbook seguinte
+    Baseado 100% em timestamps reais gravados no historico_soc.db.
+    """
+    conexao = sqlite3.connect(DB_PATH)
+    conexao.row_factory = sqlite3.Row
+    cursor = conexao.cursor()
+
+    cursor.execute("""
+        SELECT id, data_hora, tipo, cliente, alerta_recente
+        FROM historico
+        WHERE tipo IN ('relatorio_soc','relatorio_executivo','correlacao','sysmon','playbook')
+        ORDER BY id ASC
+    """)
+    registros = cursor.fetchall()
+    conexao.close()
+
+    por_cliente = {}
+    ultima_analise_por_cliente = {}
+
+    for r in registros:
+        cliente = r["cliente"] or CLIENTE_PADRAO
+
+        if cliente not in por_cliente:
+            por_cliente[cliente] = {"cliente": cliente, "amostras_deteccao": [], "amostras_resposta": []}
+
+        try:
+            data_hora_dt = _parse_data_hora(r["data_hora"])
+        except Exception:
+            continue
+
+        if r["tipo"] == "playbook":
+            anterior = ultima_analise_por_cliente.get(cliente)
+            if anterior:
+                delta = (data_hora_dt - anterior).total_seconds()
+                if delta >= 0:
+                    por_cliente[cliente]["amostras_resposta"].append(delta)
+        else:
+            alerta_dt = _parse_alerta_ts(r["alerta_recente"])
+            if alerta_dt:
+                delta = (data_hora_dt - alerta_dt).total_seconds()
+                if delta >= 0:
+                    por_cliente[cliente]["amostras_deteccao"].append(delta)
+            ultima_analise_por_cliente[cliente] = data_hora_dt
+
+    resultado = []
+    for cliente, dados in por_cliente.items():
+        det = dados["amostras_deteccao"]
+        res = dados["amostras_resposta"]
+
+        resultado.append({
+            "cliente": cliente,
+            "ttd_medio_min": round(sum(det) / len(det) / 60, 1) if det else None,
+            "ttd_amostras": len(det),
+            "ttr_medio_min": round(sum(res) / len(res) / 60, 1) if res else None,
+            "ttr_amostras": len(res),
+        })
+
+    return sorted(resultado, key=lambda r: r["cliente"])
+
+
+@app.route("/sla", methods=["GET"])
+def sla():
+    bloqueio = proteger_rota()
+    if bloqueio:
+        return bloqueio
+
+    dados = calcular_sla()
+
+    return render_template(
+        "sla.html",
+        clientes=dados,
         analista=obter_analista_logado()
     )
 
