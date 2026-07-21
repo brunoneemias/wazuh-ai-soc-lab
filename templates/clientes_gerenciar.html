@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <title>Gerenciar Clientes - AI SOC Assistant</title>
+    <style>
+        :root {
+            --bg: #020617;
+            --panel: rgba(3, 7, 18, 0.92);
+            --border: rgba(0, 255, 156, 0.22);
+            --green: #00ff9c;
+            --cyan: #00d9ff;
+            --text: #d1fae5;
+            --muted: #94a3b8;
+            --danger: #fb7185;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            background:
+                radial-gradient(circle at top left, rgba(0,217,255,0.10), transparent 25%),
+                radial-gradient(circle at bottom right, rgba(0,255,156,0.08), transparent 25%),
+                #020617;
+            color: var(--text);
+            font-family: Consolas, "Courier New", monospace;
+            min-height: 100vh;
+            padding: 24px;
+        }
+
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            background: var(--panel);
+            border: 1px solid var(--border);
+            border-radius: 18px;
+            overflow: hidden;
+            box-shadow:
+                0 0 30px rgba(0,0,0,0.55),
+                0 0 18px rgba(0,255,156,0.10);
+        }
+
+        .header {
+            padding: 18px 22px;
+            border-bottom: 1px solid rgba(0,255,156,0.14);
+            background: linear-gradient(90deg, rgba(0,255,156,0.09), rgba(0,217,255,0.07));
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .title {
+            color: var(--green);
+            font-size: 22px;
+            font-weight: bold;
+            text-shadow: 0 0 10px rgba(0,255,156,0.35);
+        }
+
+        .title::before {
+            content: ">";
+            color: var(--cyan);
+            margin-right: 8px;
+        }
+
+        .actions a {
+            color: var(--green);
+            border: 1px solid rgba(0,255,156,0.28);
+            padding: 10px 14px;
+            border-radius: 10px;
+            text-decoration: none;
+            margin-left: 8px;
+            display: inline-block;
+        }
+
+        .actions a:hover {
+            color: var(--cyan);
+            border-color: var(--cyan);
+        }
+
+        .content {
+            padding: 22px;
+        }
+
+        .subtitle {
+            color: var(--muted);
+            margin-bottom: 20px;
+            line-height: 1.5;
+        }
+
+        .form-box {
+            background: rgba(2, 6, 23, 0.72);
+            border: 1px solid rgba(0,217,255,0.18);
+            border-radius: 14px;
+            padding: 18px;
+            margin-bottom: 24px;
+        }
+
+        .form-box h3 {
+            color: var(--cyan);
+            margin-top: 0;
+            font-size: 15px;
+        }
+
+        .form-row {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+
+        .form-row div {
+            flex: 1;
+            min-width: 200px;
+        }
+
+        label {
+            display: block;
+            color: var(--muted);
+            font-size: 12px;
+            margin-bottom: 6px;
+        }
+
+        input[type="text"] {
+            width: 100%;
+            background: rgba(2, 6, 23, 0.9);
+            border: 1px solid rgba(0,255,156,0.25);
+            border-radius: 8px;
+            color: var(--text);
+            padding: 10px 12px;
+            font-family: inherit;
+            font-size: 14px;
+        }
+
+        input[type="text"]:focus {
+            outline: none;
+            border-color: var(--cyan);
+        }
+
+        button.salvar {
+            margin-top: 14px;
+            background: rgba(0,255,156,0.12);
+            border: 1px solid rgba(0,255,156,0.4);
+            color: var(--green);
+            padding: 10px 18px;
+            border-radius: 8px;
+            font-family: inherit;
+            font-size: 14px;
+            cursor: pointer;
+        }
+
+        button.salvar:hover {
+            background: rgba(0,255,156,0.2);
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        th, td {
+            text-align: left;
+            padding: 10px 12px;
+            border-bottom: 1px solid rgba(148,163,184,0.14);
+            font-size: 13px;
+        }
+
+        th {
+            color: var(--cyan);
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .btn-remover {
+            background: rgba(251,113,133,0.1);
+            border: 1px solid rgba(251,113,133,0.35);
+            color: var(--danger);
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-family: inherit;
+            font-size: 12px;
+            cursor: pointer;
+        }
+
+        .btn-remover:hover {
+            background: rgba(251,113,133,0.2);
+        }
+
+        .empty {
+            border: 1px dashed rgba(0,255,156,0.25);
+            border-radius: 14px;
+            padding: 22px;
+            color: var(--muted);
+            background: rgba(2, 6, 23, 0.55);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="title">Gerenciar Clientes</div>
+
+            <div class="actions">
+                <a href="/clientes">Visao Geral</a>
+                <a href="/">Voltar ao Chat</a>
+                <a href="/logout">Logout</a>
+            </div>
+        </div>
+
+        <div class="content">
+            <div class="subtitle">
+                Associe cada agente Wazuh a um cliente (multi-tenant simulado).<br>
+                Analista logado: <strong>{{ analista }}</strong>
+            </div>
+
+            <div class="form-box">
+                <h3>Adicionar / Atualizar mapeamento</h3>
+                <form method="POST" action="/clientes/gerenciar/salvar">
+                    <div class="form-row">
+                        <div>
+                            <label for="agente">Nome do agente Wazuh</label>
+                            <input type="text" id="agente" name="agente" placeholder="Ex: Windows_11" required>
+                        </div>
+                        <div>
+                            <label for="cliente_nome">Nome do cliente</label>
+                            <input type="text" id="cliente_nome" name="cliente_nome" placeholder="Ex: Cliente A - TechCorp Solutions" required>
+                        </div>
+                    </div>
+                    <button type="submit" class="salvar">Salvar</button>
+                </form>
+            </div>
+
+            {% if mapeamentos and mapeamentos|length > 0 %}
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Agente</th>
+                            <th>Cliente</th>
+                            <th>Acao</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for m in mapeamentos %}
+                            <tr>
+                                <td>{{ m.agente }}</td>
+                                <td>{{ m.cliente_nome }}</td>
+                                <td>
+                                    <form method="POST" action="/clientes/gerenciar/remover/{{ m.id }}" onsubmit="return confirm('Remover este mapeamento?');">
+                                        <button type="submit" class="btn-remover">Remover</button>
+                                    </form>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            {% else %}
+                <div class="empty">
+                    Nenhum cliente cadastrado ainda. Use o formulario acima para adicionar.
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</body>
+</html>

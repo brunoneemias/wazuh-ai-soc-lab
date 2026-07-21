@@ -37,12 +37,13 @@ os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
 # =========================
-# MULTI-TENANT (SIMULADO)
+# MULTI-TENANT 
 # =========================
 # Mapeia o nome do agente Wazuh pro "cliente" que ele representa numa
-# operação SOCaaS. Troque os nomes à vontade — é só rótulo de exibição,
-# não muda nada na coleta real dos alertas.
-CLIENTES_MAP = {
+# operação SOCaaS. Usado apenas para popular a tabela clientes_map na
+# primeira execução — depois disso, o gerenciamento é feito pela tela
+# /clientes/gerenciar, direto no banco.
+CLIENTES_SEED = {
     "Windows_11": "Cliente A - TechCorp Solutions",
     "kali": "Cliente B - Comercio Silva ME",
 }
@@ -95,6 +96,44 @@ def salvar_markdown(nome_arquivo, conteudo):
 # =========================
 # COLETA DE ALERTAS WAZUH
 # =========================
+def carregar_clientes_map():
+    """Retorna dict {agente: cliente_nome} pra uso na coleta de alertas."""
+    conexao = sqlite3.connect(DB_PATH)
+    cursor = conexao.cursor()
+    cursor.execute("SELECT agente, cliente_nome FROM clientes_map")
+    registros = cursor.fetchall()
+    conexao.close()
+    return {agente: nome for agente, nome in registros}
+
+
+def listar_clientes_map():
+    """Retorna lista de dicts com id/agente/cliente_nome, pra tela de gerenciamento."""
+    conexao = sqlite3.connect(DB_PATH)
+    conexao.row_factory = sqlite3.Row
+    cursor = conexao.cursor()
+    cursor.execute("SELECT id, agente, cliente_nome FROM clientes_map ORDER BY cliente_nome ASC")
+    registros = [dict(r) for r in cursor.fetchall()]
+    conexao.close()
+    return registros
+
+
+def salvar_cliente_map(agente, cliente_nome):
+    """Cria ou atualiza o mapeamento de um agente pra um cliente."""
+    conexao = sqlite3.connect(DB_PATH)
+    cursor = conexao.cursor()
+    cursor.execute("UPDATE clientes_map SET cliente_nome = ? WHERE agente = ?", (cliente_nome, agente))
+    if cursor.rowcount == 0:
+        cursor.execute("INSERT INTO clientes_map (agente, cliente_nome) VALUES (?, ?)", (agente, cliente_nome))
+    conexao.commit()
+    conexao.close()
+
+
+def remover_cliente_map(id_registro):
+    conexao = sqlite3.connect(DB_PATH)
+    cursor = conexao.cursor()
+    cursor.execute("DELETE FROM clientes_map WHERE id = ?", (id_registro,))
+    conexao.commit()
+    conexao.close()
 
 def coletar_alertas(limite=30):
     query = {
@@ -174,6 +213,7 @@ def coletar_alertas(limite=30):
 
     hits = response.json().get("hits", {}).get("hits", [])
     eventos = []
+    mapa_clientes = carregar_clientes_map()
 
     for hit in hits:
         src = hit.get("_source", {})
@@ -187,7 +227,7 @@ def coletar_alertas(limite=30):
             "timestamp": src.get("timestamp"),
             "agent": agent.get("name"),
             "agent_ip": agent.get("ip"),
-            "cliente": CLIENTES_MAP.get(agent.get("name"), CLIENTE_PADRAO),
+            "cliente": mapa_clientes.get(agent.get("name"), CLIENTE_PADRAO),
             "rule_id": rule.get("id"),
             "level": rule.get("level"),
             "description": rule.get("description"),
@@ -955,12 +995,30 @@ def inicializar_banco():
     if "cliente" not in colunas:
         cursor.execute("ALTER TABLE historico ADD COLUMN cliente TEXT")
 
+    
     if "alerta_recente" not in colunas:
         cursor.execute("ALTER TABLE historico ADD COLUMN alerta_recente TEXT")
 
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS clientes_map (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            agente TEXT NOT NULL UNIQUE,
+            cliente_nome TEXT NOT NULL
+        )
+    """)
+
+    cursor.execute("SELECT COUNT(*) FROM clientes_map")
+    total_clientes = cursor.fetchone()[0]
+
+    if total_clientes == 0:
+        for agente, nome in CLIENTES_SEED.items():
+            cursor.execute(
+                "INSERT OR IGNORE INTO clientes_map (agente, cliente_nome) VALUES (?, ?)",
+                (agente, nome)
+            )
+
     conexao.commit()
     conexao.close()
-
 def salvar_historico_db(tipo, pergunta, resposta, analista="Analista SOC", cliente=None, alerta_recente=None):
     conexao = sqlite3.connect(DB_PATH)
     cursor = conexao.cursor()
@@ -1441,14 +1499,56 @@ def clientes():
         stats = estatisticas_por_cliente(eventos)
     except Exception as e:
         stats = []
-
     return render_template(
         "clientes.html",
         clientes=stats,
         analista=obter_analista_logado()
     )
 
+
+@app.route("/clientes/gerenciar", methods=["GET"])
+def gerenciar_clientes():
+    bloqueio = proteger_rota()
+    if bloqueio:
+        return bloqueio
+
+    mapeamentos = listar_clientes_map()
+
+    return render_template(
+        "clientes_gerenciar.html",
+        mapeamentos=mapeamentos,
+        analista=obter_analista_logado()
+    )
+
+
+@app.route("/clientes/gerenciar/salvar", methods=["POST"])
+def gerenciar_clientes_salvar():
+    bloqueio = proteger_rota()
+    if bloqueio:
+        return bloqueio
+
+    agente = request.form.get("agente", "").strip()
+    cliente_nome = request.form.get("cliente_nome", "").strip()
+
+    if agente and cliente_nome:
+        salvar_cliente_map(agente, cliente_nome)
+
+    return redirect(url_for("gerenciar_clientes"))
+
+
+@app.route("/clientes/gerenciar/remover/<int:id_registro>", methods=["POST"])
+def gerenciar_clientes_remover(id_registro):
+    bloqueio = proteger_rota()
+    if bloqueio:
+        return bloqueio
+
+    remover_cliente_map(id_registro)
+
+    return redirect(url_for("gerenciar_clientes"))
+
+
 def _parse_data_hora(data_hora_str):
+
     return datetime.strptime(data_hora_str, "%d/%m/%Y %H:%M:%S")
 
 
