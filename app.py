@@ -28,6 +28,8 @@ OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-4.1-mini")
 APP_USER = os.getenv("APP_USER", "admin")
 APP_PASSWORD = os.getenv("APP_PASSWORD", "admin")
 APP_ANALYST_NAME = os.getenv("APP_ANALYST_NAME", APP_USER)
+NDR_DASHBOARD_URL = os.getenv("NDR_DASHBOARD_URL", "#")
+SYSMON_DASHBOARD_URL = os.getenv("SYSMON_DASHBOARD_URL", "#")
 
 DB_PATH = os.path.join(BASE_DIR, "data", "historico_soc.db")
 OUTPUT_DIR = os.path.join(BASE_DIR, "output")
@@ -52,6 +54,18 @@ requests.packages.urllib3.disable_warnings()
 
 app = Flask(__name__)
 #app.secret_key = os.getenv("FLASK_SECRET_KEY", "troque-essa-chave-em-producao")
+
+
+@app.context_processor
+def injetar_links_dashboards():
+    return dict(
+        ndr_dashboard_url=NDR_DASHBOARD_URL,
+        sysmon_dashboard_url=SYSMON_DASHBOARD_URL
+    )
+
+
+# Histórico em memória para evitar problemas de session/cookie
+HISTORICO = []
 
 # Histórico em memória para evitar problemas de session/cookie
 HISTORICO = []
