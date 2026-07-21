@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <title>Threat Intelligence - AI SOC Assistant</title>
+    <style>
+        :root {
+            --bg: #020617;
+            --panel: rgba(3, 7, 18, 0.92);
+            --border: rgba(0, 255, 156, 0.22);
+            --green: #00ff9c;
+            --cyan: #00d9ff;
+            --text: #d1fae5;
+            --muted: #94a3b8;
+            --danger: #fb7185;
+            --yellow: #fde047;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            background:
+                radial-gradient(circle at top left, rgba(0,217,255,0.10), transparent 25%),
+                radial-gradient(circle at bottom right, rgba(0,255,156,0.08), transparent 25%),
+                #020617;
+            color: var(--text);
+            font-family: Consolas, "Courier New", monospace;
+            min-height: 100vh;
+            padding: 24px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: var(--panel);
+            border: 1px solid var(--border);
+            border-radius: 18px;
+            overflow: hidden;
+            box-shadow:
+                0 0 30px rgba(0,0,0,0.55),
+                0 0 18px rgba(0,255,156,0.10);
+        }
+
+        .header {
+            padding: 18px 22px;
+            border-bottom: 1px solid rgba(0,255,156,0.14);
+            background: linear-gradient(90deg, rgba(0,255,156,0.09), rgba(0,217,255,0.07));
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .title {
+            color: var(--green);
+            font-size: 22px;
+            font-weight: bold;
+            text-shadow: 0 0 10px rgba(0,255,156,0.35);
+        }
+
+        .title::before {
+            content: ">";
+            color: var(--cyan);
+            margin-right: 8px;
+        }
+
+        .actions a {
+            color: var(--green);
+            border: 1px solid rgba(0,255,156,0.28);
+            padding: 10px 14px;
+            border-radius: 10px;
+            text-decoration: none;
+            margin-left: 8px;
+            display: inline-block;
+        }
+
+        .actions a:hover {
+            color: var(--cyan);
+            border-color: var(--cyan);
+        }
+
+        .content {
+            padding: 22px;
+        }
+
+        .subtitle {
+            color: var(--muted);
+            margin-bottom: 8px;
+            line-height: 1.5;
+        }
+
+        .aviso {
+            border: 1px dashed rgba(253,224,71,0.35);
+            border-radius: 12px;
+            padding: 14px 16px;
+            color: var(--yellow);
+            font-size: 13px;
+            line-height: 1.6;
+            margin-bottom: 22px;
+            background: rgba(2, 6, 23, 0.5);
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        th, td {
+            text-align: left;
+            padding: 10px 12px;
+            border-bottom: 1px solid rgba(148,163,184,0.14);
+            font-size: 13px;
+        }
+
+        th {
+            color: var(--cyan);
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .badge {
+            font-size: 11px;
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-weight: bold;
+            border: 1px solid transparent;
+            display: inline-block;
+        }
+
+        .badge-baixo {
+            color: var(--green);
+            border-color: rgba(0,255,156,0.35);
+            background: rgba(0,255,156,0.08);
+        }
+
+        .badge-medio {
+            color: var(--yellow);
+            border-color: rgba(253,224,71,0.35);
+            background: rgba(253,224,71,0.08);
+        }
+
+        .badge-alto {
+            color: var(--danger);
+            border-color: rgba(251,113,133,0.4);
+            background: rgba(251,113,133,0.1);
+        }
+
+        .badge-privado {
+            color: var(--muted);
+            border-color: rgba(148,163,184,0.3);
+        }
+
+        .badge-erro {
+            color: var(--muted);
+            border-color: rgba(148,163,184,0.2);
+            font-style: italic;
+        }
+
+        .ip-cell {
+            font-weight: bold;
+        }
+
+        .empty {
+            border: 1px dashed rgba(0,255,156,0.25);
+            border-radius: 14px;
+            padding: 22px;
+            color: var(--muted);
+            background: rgba(2, 6, 23, 0.55);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="title">Threat Intelligence - Reputacao de IPs</div>
+
+            <div class="actions">
+                <a href="/">Voltar ao Chat</a>
+                <a href="/logout">Logout</a>
+            </div>
+        </div>
+
+        <div class="content">
+            <div class="subtitle">
+                Reputacao dos IPs de origem mais frequentes nos alertas recentes, consultada via AbuseIPDB.<br>
+                Analista logado: <strong>{{ analista }}</strong>
+            </div>
+
+            {% if not api_configurada %}
+                <div class="aviso">
+                    A chave da API AbuseIPDB nao esta configurada no .env (ABUSEIPDB_API_KEY). As consultas nao vao retornar dados ate isso ser configurado.
+                </div>
+            {% endif %}
+
+            {% if resultados and resultados|length > 0 %}
+                <table>
+                    <thead>
+                        <tr>
+                            <th>IP</th>
+                            <th>Alertas no lote</th>
+                            <th>Reputacao</th>
+                            <th>Pais</th>
+                            <th>Reports (AbuseIPDB)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for r in resultados %}
+                            <tr>
+                                <td class="ip-cell">{{ r.ip }}</td>
+                                <td>{{ r.total_alertas }}</td>
+                                {% if r.privado %}
+                                    <td><span class="badge badge-privado">IP privado - nao consultado</span></td>
+                                    <td>-</td>
+                                    <td>-</td>
+                                {% elif r.erro %}
+                                    <td><span class="badge badge-erro">Erro: {{ r.erro }}</span></td>
+                                    <td>-</td>
+                                    <td>-</td>
+                                {% else %}
+                                    <td>
+                                        {% if r.score >= 50 %}
+                                            <span class="badge badge-alto">{{ r.score }}/100 - Alto risco</span>
+                                        {% elif r.score >= 10 %}
+                                            <span class="badge badge-medio">{{ r.score }}/100 - Suspeito</span>
+                                        {% else %}
+                                            <span class="badge badge-baixo">{{ r.score }}/100 - Baixo risco</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ r.pais }}</td>
+                                    <td>{{ r.total_reports }}</td>
+                                {% endif %}
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            {% else %}
+                <div class="empty">
+                    Nenhum IP de origem encontrado nos alertas recentes para consultar.
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</body>
+</html>

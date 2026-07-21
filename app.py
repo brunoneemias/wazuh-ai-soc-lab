@@ -30,6 +30,7 @@ APP_PASSWORD = os.getenv("APP_PASSWORD", "admin")
 APP_ANALYST_NAME = os.getenv("APP_ANALYST_NAME", APP_USER)
 NDR_DASHBOARD_URL = os.getenv("NDR_DASHBOARD_URL", "#")
 SYSMON_DASHBOARD_URL = os.getenv("SYSMON_DASHBOARD_URL", "#")
+ABUSEIPDB_API_KEY = os.getenv("ABUSEIPDB_API_KEY", "")
 
 DB_PATH = os.path.join(BASE_DIR, "data", "historico_soc.db")
 OUTPUT_DIR = os.path.join(BASE_DIR, "output")
@@ -134,6 +135,93 @@ def remover_cliente_map(id_registro):
     cursor.execute("DELETE FROM clientes_map WHERE id = ?", (id_registro,))
     conexao.commit()
     conexao.close()
+
+def ip_e_privado(ip):
+    """Verifica se um IPv4 é de rede privada/local (não faz sentido consultar reputação externa)."""
+    if not ip:
+        return True
+
+    partes = ip.split(".")
+    if len(partes) != 4:
+        return True
+
+    try:
+        octetos = [int(p) for p in partes]
+    except ValueError:
+        return True
+
+    if octetos[0] == 10:
+        return True
+    if octetos[0] == 172 and 16 <= octetos[1] <= 31:
+        return True
+    if octetos[0] == 192 and octetos[1] == 168:
+        return True
+    if octetos[0] == 127:
+        return True
+
+    return False
+
+
+def obter_reputacao_ip(ip, max_idade_horas=24):
+    """
+    Consulta a reputação de um IP na AbuseIPDB, com cache no banco (evita
+    estourar o limite gratuito da API). IPs privados nunca são consultados.
+    """
+    if ip_e_privado(ip):
+        return {"ip": ip, "privado": True}
+
+    conexao = sqlite3.connect(DB_PATH)
+    conexao.row_factory = sqlite3.Row
+    cursor = conexao.cursor()
+    cursor.execute("SELECT * FROM ip_reputacao WHERE ip = ?", (ip,))
+    registro = cursor.fetchone()
+
+    if registro:
+        try:
+            consultado_em = datetime.strptime(registro["consultado_em"], "%d/%m/%Y %H:%M:%S")
+            if (datetime.now() - consultado_em).total_seconds() < max_idade_horas * 3600:
+                conexao.close()
+                return {
+                    "ip": ip,
+                    "privado": False,
+                    "score": registro["score"],
+                    "pais": registro["pais"],
+                    "total_reports": registro["total_reports"],
+                    "cache": True
+                }
+        except Exception:
+            pass
+
+    if not ABUSEIPDB_API_KEY:
+        conexao.close()
+        return {"ip": ip, "privado": False, "erro": "API key nao configurada"}
+
+    try:
+        resposta = requests.get(
+            "https://api.abuseipdb.com/api/v2/check",
+            headers={"Key": ABUSEIPDB_API_KEY, "Accept": "application/json"},
+            params={"ipAddress": ip, "maxAgeInDays": 90},
+            timeout=10
+        )
+        dados = resposta.json().get("data", {})
+        score = dados.get("abuseConfidenceScore", 0)
+        pais = dados.get("countryCode") or "??"
+        total_reports = dados.get("totalReports", 0)
+        agora = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+
+        cursor.execute("UPDATE ip_reputacao SET score=?, pais=?, total_reports=?, consultado_em=? WHERE ip=?",
+                        (score, pais, total_reports, agora, ip))
+        if cursor.rowcount == 0:
+            cursor.execute("INSERT INTO ip_reputacao (ip, score, pais, total_reports, consultado_em) VALUES (?, ?, ?, ?, ?)",
+                            (ip, score, pais, total_reports, agora))
+        conexao.commit()
+        conexao.close()
+
+        return {"ip": ip, "privado": False, "score": score, "pais": pais, "total_reports": total_reports, "cache": False}
+
+    except Exception as e:
+        conexao.close()
+        return {"ip": ip, "privado": False, "erro": str(e)}
 
 def coletar_alertas(limite=30):
     query = {
@@ -1016,6 +1104,15 @@ def inicializar_banco():
                 "INSERT OR IGNORE INTO clientes_map (agente, cliente_nome) VALUES (?, ?)",
                 (agente, nome)
             )
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS ip_reputacao (
+            ip TEXT PRIMARY KEY,
+            score INTEGER,
+            pais TEXT,
+            total_reports INTEGER,
+            consultado_em TEXT
+        )
+    """)
 
     conexao.commit()
     conexao.close()
@@ -1546,6 +1643,38 @@ def gerenciar_clientes_remover(id_registro):
 
     return redirect(url_for("gerenciar_clientes"))
 
+@app.route("/threat-intel", methods=["GET"])
+def threat_intel():
+    bloqueio = proteger_rota()
+    if bloqueio:
+        return bloqueio
+
+    try:
+        eventos = coletar_alertas(limite=100)
+
+        contagem_ips = {}
+        for e in eventos:
+            ip = e.get("src_ip")
+            if ip:
+                contagem_ips[ip] = contagem_ips.get(ip, 0) + 1
+
+        top_ips = sorted(contagem_ips.items(), key=lambda x: x[1], reverse=True)[:15]
+
+        resultados = []
+        for ip, total_alertas in top_ips:
+            rep = obter_reputacao_ip(ip)
+            rep["total_alertas"] = total_alertas
+            resultados.append(rep)
+
+    except Exception:
+        resultados = []
+
+    return render_template(
+        "threat_intel.html",
+        resultados=resultados,
+        api_configurada=bool(ABUSEIPDB_API_KEY),
+        analista=obter_analista_logado()
+    )
 
 def _parse_data_hora(data_hora_str):
 
