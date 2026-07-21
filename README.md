@@ -18,9 +18,9 @@ Este projeto apresenta a construção de um laboratório de segurança defensiva
 
 A proposta é simular um ambiente corporativo monitorado por um SOC, onde eventos de rede, endpoint Linux, endpoint Windows e integridade de arquivos são centralizados no Wazuh e analisados por um assistente de IA.
 
-O projeto evoluiu de um laboratório simples de Wazuh para um protótipo de **mini SOC/XDR com IA**, capaz de gerar:
+O projeto evoluiu de um laboratório simples de Wazuh para um protótipo de **mini SOC/XDR com IA**, e mais recentemente para uma **prova de conceito de SOCaaS (Security Operations Center as a Service)**, capaz de gerar:
 
-- Relatórios SOC automatizados;
+- Relatórios SOC automatizados (técnico e executivo);
 - Playbooks de resposta a incidentes;
 - Correlação de eventos;
 - Mapeamento MITRE ATT&CK;
@@ -29,10 +29,11 @@ O projeto evoluiu de um laboratório simples de Wazuh para um protótipo de **mi
 - Histórico persistente em SQLite;
 - Identificação do analista logado;
 - Download de evidências;
+- Visão multi-tenant simulada (por cliente);
+- Painel de SLA simulado (TTD/TTR);
 - Dashboard NDR;
 - Dashboard Windows/Sysmon;
-- Página de apresentação do projeto;
-- Scripts de demonstração para Kali Linux e Windows.
+- Página de apresentação do projeto.
 
 ---
 
@@ -52,6 +53,7 @@ O projeto busca responder perguntas como:
 - Quais técnicas MITRE ATT&CK podem estar relacionadas?
 - Quais ações o SOC deveria tomar?
 - Quais automações podem ser aplicadas?
+- Como um mesmo ambiente Wazuh poderia atender múltiplos clientes (SOCaaS)?
 
 ---
 
@@ -86,6 +88,7 @@ O projeto busca responder perguntas como:
 | Flask + OpenAI API      |
 | Chat + SQLite + MITRE   |
 | Reports + Playbooks     |
+| Multi-tenant + SLA      |
 +-------------------------+
 ```
 
@@ -280,31 +283,36 @@ Campos importantes observados:
 
 ### 6. Dashboard NDR
 
-Foi criado um dashboard NDR no Wazuh/OpenSearch Dashboard utilizando eventos do Suricata.
+Foi criado um dashboard NDR completo no Wazuh Dashboard, utilizando eventos do Suricata.
 
-Nome sugerido:
+Nome do dashboard:
 
 ```text
-NDR - Suricata Network Detection
+NDR Dashboard - AI SOC Lab
 ```
 
 Painéis criados:
 
 | Painel | Tipo | Campo |
 |---|---|---|
-| Alertas NDR por minuto | Line Chart | `timestamp` |
-| Top IPs de origem | Data Table | `data.src_ip` |
-| Top IPs de destino | Data Table | `data.dest_ip` |
-| Top Assinaturas IDS | Data Table | `data.alert.signature` |
-| Categorias de alerta | Pie/Data Table | `data.alert.category` |
-| Severidade IDS | Bar/Pie/Data Table | `data.alert.severity` |
-| Protocolos detectados | Pie/Data Table | `data.proto` |
+| Total de Alertas Suricata | Metric | Contagem (`rule.groups: suricata`) |
+| Alertas ao Longo do Tempo | Area Chart | `timestamp` |
+| Top 10 Assinaturas IDS | Horizontal Bar | `data.alert.signature` |
+| Top IPs de Origem | Horizontal Bar | `data.src_ip` |
+| Top IPs de Destino | Horizontal Bar | `data.dest_ip` |
+| Distribuição por Protocolo | Donut | `data.proto` |
+| Categoria de Ataque | Donut | `data.alert.category` |
+| Severidade dos Alertas | Pie | `data.alert.severity` |
+| Top Portas de Destino | Data Table | `data.dest_port` |
+| Alertas por Agente | Bar | `agent.name` |
 
 Filtro principal:
 
 ```text
 rule.groups: suricata
 ```
+
+> Os painéis de IP de origem/destino excluem endereços de rede irrelevantes para investigação (link-local, multicast, broadcast) para manter o foco em hosts reais.
 
 ---
 
@@ -356,28 +364,27 @@ data.win.eventdata.queryName
 
 ### 8. Dashboard Windows/Sysmon
 
-Foi criado um dashboard específico para o endpoint Windows com eventos Sysmon.
+Foi criado um dashboard dedicado ao endpoint Windows com eventos Sysmon.
 
-Nome sugerido:
+Nome do dashboard:
 
 ```text
-SOC - Windows Sysmon Monitoring
+Windows Endpoint / Sysmon - AI SOC Lab
 ```
 
-Painéis sugeridos/criados:
+Painéis criados:
 
 | Painel | Tipo | Campo |
 |---|---|---|
-| Eventos Sysmon por minuto | Line Chart | `timestamp` |
-| Eventos por Event ID | Data Table | `data.win.system.eventID` |
-| Processos executados | Data Table | `data.win.eventdata.image` |
-| Command Lines | Data Table | `data.win.eventdata.commandLine` |
-| Processos pai | Data Table | `data.win.eventdata.parentImage` |
-| IPs de destino | Data Table | `data.win.eventdata.destinationIp` |
-| Portas de destino | Data Table | `data.win.eventdata.destinationPort` |
-| DNS Queries | Data Table | `data.win.eventdata.queryName` |
-| Usuários envolvidos | Data Table | `data.win.eventdata.user` |
-| Regras Wazuh mais acionadas | Data Table | `rule.description` |
+| Total de Eventos Sysmon | Metric | Contagem |
+| Eventos ao Longo do Tempo | Area Chart | `timestamp` |
+| Severidade dos Eventos | Donut | `rule.level` |
+| Eventos por Event ID | Donut | `data.win.system.eventID` |
+| Usuários | Donut | `data.win.eventdata.user` |
+| Top Processos Executados | Horizontal Bar | `data.win.eventdata.image` |
+| Top Parent Process | Horizontal Bar | `data.win.eventdata.parentImage` |
+| Regras Mais Acionadas | Horizontal Bar | `rule.description` |
+| Top Command Lines | Data Table | `data.win.eventdata.commandLine` |
 
 Filtro principal:
 
@@ -385,38 +392,7 @@ Filtro principal:
 data.win.system.channel: "Microsoft-Windows-Sysmon/Operational"
 ```
 
-### 10. Multi-Tenant Simulado (Clientes)
-
-Para se aproximar do modelo de operação de uma SOCaaS (Security Operations Center as a Service), o projeto simula múltiplos clientes a partir dos agentes Wazuh conectados — cada agente representa uma organização diferente sendo monitorada.
-
-A interface exibe, por cliente:
-
-- Total de eventos coletados;
-- Distribuição por severidade (crítico, alto, médio, baixo);
-- Data/hora do último alerta.
-
-Isso demonstra como um único ambiente Wazuh pode ser adaptado para operar múltiplos clientes de forma segregada visualmente, um requisito central de qualquer produto SOCaaS.
-
-### 11. Relatório Executivo com IA
-
-Além do relatório técnico (com MITRE ATT&CK, IOCs e termos de SOC), o projeto gera uma versão do relatório em **linguagem de negócio**, voltada para gestores e clientes não técnicos.
-
-O relatório executivo:
-
-- Traduz severidade técnica em impacto de negócio;
-- Remove jargão técnico e tabelas técnicas;
-- Apresenta nível de risco e ações recomendadas de forma objetiva.
-
-Essa dualidade (relatório técnico + relatório executivo) reflete como uma operação SOCaaS real precisa comunicar o mesmo incidente de formas diferentes, dependendo do público.
-
-### 12. Painel de SLA Simulado (TTD/TTR)
-
-O projeto calcula duas métricas operacionais a partir de timestamps reais registrados no histórico:
-
-- **TTD (Tempo de Detecção):** intervalo entre o alerta mais recente do lote e o momento em que a IA gerou a análise;
-- **TTR (Tempo de Resposta):** intervalo entre a última análise de um cliente e o playbook de resposta gerado em seguida.
-
-Essas métricas são exibidas por cliente, simulando o tipo de SLA que uma operação SOCaaS real acompanha e reporta para seus clientes.
+> Um painel de Conexões de Rede (Event ID 3) estava planejado, mas o Sysmon neste host não está configurado para capturar esse tipo de evento — ver seção de Melhorias Futuras.
 
 ---
 
@@ -434,11 +410,14 @@ A interface permite:
 - Visual estilo terminal/SOC;
 - Página sobre o projeto;
 - Perguntas livres sobre alertas;
-- Geração de relatório SOC;
+- Geração de relatório SOC (técnico);
+- Geração de relatório executivo (linguagem de negócio);
 - Geração de playbook de resposta;
 - Geração de correlação de incidente;
 - Análise dedicada de Sysmon;
 - Mapeamento MITRE ATT&CK;
+- Visão multi-tenant simulada por cliente;
+- Painel de SLA simulado (TTD/TTR);
 - Download de relatórios;
 - Download de alertas JSON;
 - Histórico persistente em SQLite;
@@ -453,21 +432,63 @@ Funções disponíveis no menu:
 > analisar_fim()
 > prioridade_soc()
 > gerar_relatorio_soc()
+> gerar_relatorio_executivo()
 > gerar_playbook_incidente()
 > correlacionar_incidente()
 > analisar_sysmon()
-> gerar_relatorio_executivo()
 > visualizar_clientes()
 > visualizar_sla()
 > sobre_projeto()
 > visualizar_historico()
 > baixar_relatorio_ia.md
+> baixar_relatorio_executivo.md
 > baixar_playbook.md
 > baixar_correlacao.md
 > baixar_analise_sysmon.md
 > baixar_alertas.json
 > baixar_historico_soc.db
 ```
+
+---
+
+### 10. Multi-Tenant Simulado (Clientes)
+
+Para se aproximar do modelo de operação de uma SOCaaS (Security Operations Center as a Service), o projeto simula múltiplos clientes a partir dos agentes Wazuh conectados — cada agente representa uma organização diferente sendo monitorada.
+
+A interface exibe, por cliente:
+
+- Total de eventos coletados;
+- Distribuição por severidade (crítico, alto, médio, baixo);
+- Data/hora do último alerta.
+
+Isso demonstra como um único ambiente Wazuh pode ser adaptado para operar múltiplos clientes de forma segregada visualmente, um requisito central de qualquer produto SOCaaS.
+
+---
+
+### 11. Relatório Executivo com IA
+
+Além do relatório técnico (com MITRE ATT&CK, IOCs e termos de SOC), o projeto gera uma versão do relatório em **linguagem de negócio**, voltada para gestores e clientes não técnicos.
+
+O relatório executivo:
+
+- Traduz severidade técnica em impacto de negócio;
+- Remove jargão técnico e tabelas técnicas;
+- Apresenta nível de risco e ações recomendadas de forma objetiva.
+
+Essa dualidade (relatório técnico + relatório executivo) reflete como uma operação SOCaaS real precisa comunicar o mesmo incidente de formas diferentes, dependendo do público.
+
+---
+
+### 12. Painel de SLA Simulado (TTD/TTR)
+
+O projeto calcula duas métricas operacionais a partir de timestamps reais registrados no histórico:
+
+- **TTD (Tempo de Detecção):** intervalo entre o alerta mais recente do lote e o momento em que a IA gerou a análise;
+- **TTR (Tempo de Resposta):** intervalo entre a última análise de um cliente e o playbook de resposta gerado em seguida.
+
+Essas métricas são exibidas por cliente, simulando o tipo de SLA que uma operação SOCaaS real acompanha e reporta para seus clientes.
+
+> São métricas simuladas de laboratório, calculadas em cima de timestamps reais — não um SLA contratual de produção.
 
 ---
 
@@ -612,7 +633,7 @@ Foi implementado histórico persistente em SQLite para registrar as análises re
 Arquivo do banco:
 
 ```text
-historico_soc.db
+data/historico_soc.db
 ```
 
 Campos armazenados:
@@ -625,6 +646,8 @@ Campos armazenados:
 | `tipo` | Tipo de análise |
 | `pergunta` | Pergunta ou ação executada |
 | `resposta` | Resposta gerada pela IA |
+| `cliente` | Cliente predominante no lote de eventos analisado |
+| `alerta_recente` | Timestamp do alerta mais recente do lote (usado no cálculo de SLA) |
 
 A interface possui uma página dedicada:
 
@@ -698,6 +721,7 @@ wazuh-ai-soc-lab/
 │   ├── alertas_wazuh.json
 │   ├── relatorio_soc.md
 │   ├── relatorio_ia_soc.md
+│   ├── relatorio_executivo.md
 │   ├── playbook_incidente.md
 │   ├── correlacao_soc.md
 │   └── analise_sysmon.md
@@ -705,6 +729,8 @@ wazuh-ai-soc-lab/
 │   ├── index.html
 │   ├── login.html
 │   ├── historico.html
+│   ├── clientes.html
+│   ├── sla.html
 │   └── sobre.html
 ├── legacy_cli/
 │   ├── coletar_alertas.py
@@ -731,9 +757,9 @@ wazuh-ai-soc-lab/
     └── 10_downloads.png
 ```
 
-> Observação: data/, output/, .env e evidências sensíveis ficam no .gitignore e não devem ser publicados com dados reais.
+> Observação: `data/`, `output/`, `.env` e evidências sensíveis ficam no `.gitignore` e não devem ser publicados com dados reais.
 
-> app.py é a aplicação Flask atual, autossuficiente. legacy_cli/ guarda a primeira versão do projeto (pipeline via linha de comando), mantida como registro da evolução do laboratório.
+> `app.py` é a aplicação Flask atual, autossuficiente. `legacy_cli/` guarda a primeira versão do projeto (pipeline via linha de comando), mantida como registro da evolução do laboratório.
 
 ---
 
@@ -816,12 +842,6 @@ Acessar no navegador:
 http://IP_DO_WAZUH_SERVER:5000
 ```
 
-Exemplo:
-
-```text
-http://192.168.1.7:5000
-```
-
 ---
 
 ## 🧪 Como Gerar Alertas para Teste
@@ -860,54 +880,7 @@ powershell -Command "Get-Process | Select-Object -First 5"
 curl http://IP_DO_KALI
 ```
 
----
-
-## 🧪 Scripts de Demonstração
-
-### Script Kali
-
-Arquivo sugerido:
-
-```text
-scripts/demo_eventos_kali.sh
-```
-
-Função:
-
-- Gerar eventos FIM;
-- Gerar tentativas SSH;
-- Apoiar a demonstração dos alertas Linux/Wazuh.
-
-Execução:
-
-```bash
-chmod +x scripts/demo_eventos_kali.sh
-./scripts/demo_eventos_kali.sh
-```
-
-### Script Windows
-
-Arquivo sugerido:
-
-```text
-scripts/demo_eventos_windows.ps1
-```
-
-Função:
-
-- Gerar eventos de criação de processos;
-- Gerar execução de PowerShell e CMD;
-- Gerar conexões HTTP;
-- Gerar DNS queries;
-- Gerar eventos de arquivo e registro.
-
-Execução:
-
-```powershell
-cd C:\Tools
-Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
-.\demo_eventos_windows.ps1 -KaliIP IP_DO_KALI -WazuhIP IP_DO_WAZUH
-```
+> Os testes acima são executados manualmente. A criação de scripts de automação para gerar esses eventos está listada na seção de Melhorias Futuras.
 
 ---
 
@@ -928,11 +901,21 @@ Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
 
 ---
 
+## 📊 Acesso aos Dashboards
+
+- **NDR Dashboard**: `https://IP_DO_WAZUH_SERVER/app/dashboards` → *NDR Dashboard - AI SOC Lab*
+- **Windows Endpoint / Sysmon**: `https://IP_DO_WAZUH_SERVER/app/dashboards` → *Windows Endpoint / Sysmon - AI SOC Lab*
+
+> O IP é da rede interna do laboratório e pode variar conforme o ambiente. Ambos os dashboards utilizam tema escuro e uma combinação de gráficos de área, rosca, barras horizontais e tabelas.
+
+---
+
 ## 📥 Downloads pela Interface
 
 | Arquivo | Rota |
 |---|---|
 | `relatorio_ia_soc.md` | `/download/relatorio` |
+| `relatorio_executivo.md` | `/download/executivo` |
 | `playbook_incidente.md` | `/download/playbook` |
 | `correlacao_soc.md` | `/download/correlacao` |
 | `analise_sysmon.md` | `/download/sysmon` |
@@ -964,21 +947,38 @@ Sequência sugerida para apresentação:
 2. Fazer login no AI SOC Assistant;
 3. Mostrar o Dashboard NDR;
 4. Mostrar o Dashboard Windows/Sysmon;
-5. Rodar o script de eventos no Kali;
-6. Rodar o script de eventos no Windows;
-7. Clicar em `analisar_sysmon()`;
-8. Clicar em `correlacionar_incidente()`;
-9. Mostrar o mapeamento MITRE ATT&CK;
-10. Gerar `gerar_playbook_incidente()`;
-11. Abrir `visualizar_historico()`;
-12. Mostrar o analista `Bruno Neemias` registrado no histórico;
-13. Baixar relatório ou evidência.
+5. Gerar eventos de teste no Kali e no Windows (seção "Como Gerar Alertas para Teste");
+6. Clicar em `analisar_sysmon()`;
+7. Clicar em `correlacionar_incidente()`;
+8. Mostrar o mapeamento MITRE ATT&CK;
+9. Gerar `gerar_playbook_incidente()`;
+10. Gerar `gerar_relatorio_executivo()` e comparar com o relatório técnico;
+11. Abrir `visualizar_clientes()` e mostrar a visão multi-tenant;
+12. Abrir `visualizar_sla()` e mostrar TTD/TTR por cliente;
+13. Abrir `visualizar_historico()`;
+14. Mostrar o analista `Bruno Neemias` registrado no histórico;
+15. Baixar relatório ou evidência.
 
 Fluxo demonstrado:
 
 ```text
-Detectar → Correlacionar → Analisar com IA → Mapear MITRE → Gerar Playbook → Exportar Evidência → Auditar Histórico
+Detectar → Correlacionar → Analisar com IA → Mapear MITRE → Gerar Playbook → Comunicar (técnico + executivo) → Medir SLA → Exportar Evidência → Auditar Histórico
 ```
+
+---
+
+## 🖼️ Capturas de Tela
+
+### Dashboard NDR
+![NDR Dashboard](prints/04_dashboard_ndr.png)
+
+### Dashboard Windows/Sysmon
+![Sysmon Dashboard](prints/05_dashboard_sysmon.png)
+
+### Chat IA com Mapeamento MITRE ATT&CK
+![Relatório IA](prints/06_relatorio_ia_mitre.png)
+
+> Demais capturas (login, playbook, correlação, histórico, downloads) disponíveis na pasta [`/prints`](prints/).
 
 ---
 
@@ -990,36 +990,36 @@ Detectar → Correlacionar → Analisar com IA → Mapear MITRE → Gerar Playbo
 - ✅ Detecção de brute force SSH
 - ✅ Monitoramento de integridade de arquivos
 - ✅ Coleta de eventos Windows/Sysmon
-- ✅ Dashboard NDR
-- ✅ Dashboard Windows/Sysmon
+- ✅ Dashboard NDR (10 painéis)
+- ✅ Dashboard Windows/Sysmon (9 painéis)
 - ✅ Chat IA para análise de alertas
 - ✅ Login simples
 - ✅ Página Sobre o Projeto
 - ✅ Histórico persistente em SQLite
 - ✅ Identificação do analista logado
-- ✅ Geração de relatórios SOC
+- ✅ Geração de relatórios SOC (técnico e executivo)
 - ✅ Geração de playbooks
 - ✅ Correlação automática de eventos
 - ✅ Mapeamento MITRE ATT&CK
 - ✅ Exportação de evidências
-- ✅ Scripts de demonstração para Linux e Windows
 - ✅ Multi-tenant simulado (visão por cliente)
-- ✅ Relatório executivo em linguagem de negócio
 - ✅ Painel de SLA simulado (TTD/TTR) por cliente
 
 ---
 
 ## 🧠 Valor para um SOC
 
-Este projeto demonstra como um SOC pode utilizar automação e IA para acelerar tarefas como:
+Este projeto demonstra como um SOC — inclusive uma operação SOCaaS atendendo múltiplos clientes — pode utilizar automação e IA para acelerar tarefas como:
 
 - Triagem de alertas;
 - Priorização de incidentes;
 - Correlação de eventos;
 - Investigação inicial;
-- Geração de relatórios;
+- Geração de relatórios técnicos e executivos;
 - Padronização de resposta;
 - Registro e auditoria das análises;
+- Segregação de visão por cliente;
+- Acompanhamento de métricas operacionais (SLA);
 - Apoio à tomada de decisão.
 
 A IA não substitui o analista, mas atua como apoio para reduzir o tempo de análise e melhorar a qualidade da resposta.
@@ -1044,6 +1044,8 @@ A IA não substitui o analista, mas atua como apoio para reduzir o tempo de aná
 - [ ] Relatórios em HTML
 - [ ] Integração com Active Response para ações semi-automatizadas
 - [ ] Página de incidentes com status de tratamento
+- [ ] Habilitar Event ID 3 (Network Connection) no Sysmon do Windows para adicionar painel de conexões de rede
+- [ ] Scripts de automação para geração de eventos de teste (Kali e Windows)
 
 ---
 
@@ -1068,14 +1070,15 @@ Recomendações:
 Projeto desenvolvido como laboratório acadêmico e prático de segurança defensiva, com foco em SIEM, SOC, NDR, XDR, Sysmon, Active Response e Inteligência Artificial aplicada à análise de alertas.
 
 [LinkedIn](https://linkedin.com/in/brunoneemias) [GitHub](https://github.com/brunoneemias)
+
 ---
 
 ## 🏁 Conclusão
 
-O laboratório demonstra a evolução de um ambiente Wazuh tradicional para uma arquitetura mais completa, integrando telemetria de rede, Linux, Windows e IA.
+O laboratório demonstra a evolução de um ambiente Wazuh tradicional para uma arquitetura mais completa, integrando telemetria de rede, Linux, Windows e IA — e, mais recentemente, para uma prova de conceito de operação SOCaaS.
 
-A solução final permite que um analista SOC consulte alertas, gere relatórios, crie playbooks, correlacione eventos, mapeie técnicas MITRE ATT&CK, visualize histórico persistente e baixe evidências diretamente por uma interface web.
+A solução final permite que um analista SOC consulte alertas, gere relatórios técnicos e executivos, crie playbooks, correlacione eventos, mapeie técnicas MITRE ATT&CK, visualize histórico persistente, acompanhe múltiplos clientes simulados, monitore métricas de SLA e baixe evidências diretamente por uma interface web.
 
 O projeto simula um cenário corporativo de produção em laboratório e demonstra na prática conceitos de:
 
-`SIEM` · `XDR` · `NDR` · `FIM` · `Sysmon` · `Active Response` · `Threat Hunting` · `Incident Response` · `SOC Automation` · `MITRE ATT&CK` · `AI-assisted Security Operations`
+`SIEM` · `XDR` · `NDR` · `FIM` · `Sysmon` · `Active Response` · `Threat Hunting` · `Incident Response` · `SOC Automation` · `MITRE ATT&CK` · `SOCaaS` · `AI-assisted Security Operations`
