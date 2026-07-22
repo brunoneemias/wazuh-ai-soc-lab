@@ -5,7 +5,7 @@ import markdown
 import secrets
 import sqlite3
 
-from datetime import datetime
+from datetime import datetime, timedelta
 from collections import Counter
 from dotenv import load_dotenv
 from flask import Flask, render_template, request, redirect, url_for, send_file, make_response
@@ -73,6 +73,48 @@ HISTORICO = []
 HISTORICO = []
 
 TOKENS_LOGIN = {}
+
+# =========================
+# RATE LIMIT DO LOGIN
+# =========================
+TENTATIVAS_LOGIN = {}
+MAX_TENTATIVAS_LOGIN = 5
+JANELA_TENTATIVAS_MINUTOS = 5
+BLOQUEIO_MINUTOS = 5
+
+
+def obter_ip_cliente():
+    return request.remote_addr or "desconhecido"
+
+
+def ip_esta_bloqueado(ip):
+    registro = TENTATIVAS_LOGIN.get(ip)
+    if not registro:
+        return False, 0
+
+    bloqueado_ate = registro.get("bloqueado_ate")
+    if bloqueado_ate and datetime.now() < bloqueado_ate:
+        minutos_restantes = int((bloqueado_ate - datetime.now()).total_seconds() / 60) + 1
+        return True, minutos_restantes
+
+    return False, 0
+
+
+def registrar_falha_login(ip):
+    agora = datetime.now()
+    registro = TENTATIVAS_LOGIN.setdefault(ip, {"falhas": [], "bloqueado_ate": None})
+
+    limite = agora - timedelta(minutes=JANELA_TENTATIVAS_MINUTOS)
+    registro["falhas"] = [f for f in registro["falhas"] if f > limite]
+    registro["falhas"].append(agora)
+
+    if len(registro["falhas"]) >= MAX_TENTATIVAS_LOGIN:
+        registro["bloqueado_ate"] = agora + timedelta(minutes=BLOQUEIO_MINUTOS)
+        registro["falhas"] = []
+
+
+def limpar_tentativas_login(ip):
+    TENTATIVAS_LOGIN.pop(ip, None)
 
 # =========================
 # FUNÇÕES AUXILIARES
@@ -1136,26 +1178,43 @@ def salvar_historico_db(tipo, pergunta, resposta, analista="Analista SOC", clien
     conexao.commit()
     conexao.close()
 
-def carregar_historico_db(limite=8):
+def carregar_historico_db(limite=20, offset=0, tipo=None, analista=None, cliente=None):
     conexao = sqlite3.connect(DB_PATH)
     conexao.row_factory = sqlite3.Row
     cursor = conexao.cursor()
 
-    cursor.execute("""
-        SELECT id, data_hora, tipo, pergunta, resposta, analista
-        FROM historico
-        ORDER BY id DESC
-        LIMIT ?       
-    """, (limite,))
+    condicoes = []
+    parametros = []
 
+    if tipo:
+        condicoes.append("tipo = ?")
+        parametros.append(tipo)
+    if analista:
+        condicoes.append("analista = ?")
+        parametros.append(analista)
+    if cliente:
+        condicoes.append("cliente = ?")
+        parametros.append(cliente)
+
+    where_clause = ("WHERE " + " AND ".join(condicoes)) if condicoes else ""
+
+    cursor.execute(f"""
+        SELECT id, data_hora, tipo, pergunta, resposta, analista, cliente
+        FROM historico
+        {where_clause}
+        ORDER BY id DESC
+        LIMIT ? OFFSET ?
+    """, parametros + [limite, offset])
     registros = cursor.fetchall()
+
+    cursor.execute(f"SELECT COUNT(*) FROM historico {where_clause}", parametros)
+    total = cursor.fetchone()[0]
+
     conexao.close()
 
     historico = []
-
     for item in registros:
         resposta_html = markdown_to_html(item["resposta"])
-
         historico.append({
             "id": item["id"],
             "data_hora": item["data_hora"],
@@ -1163,11 +1222,28 @@ def carregar_historico_db(limite=8):
             "pergunta": item["pergunta"],
             "resposta": item["resposta"],
             "resposta_html": resposta_html,
-            "analista": item["analista"]
+            "analista": item["analista"],
+            "cliente": item["cliente"]
         })
 
-    return historico
+    return historico, total
 
+
+def obter_opcoes_filtro_historico():
+    conexao = sqlite3.connect(DB_PATH)
+    cursor = conexao.cursor()
+
+    cursor.execute("SELECT DISTINCT tipo FROM historico ORDER BY tipo")
+    tipos = [r[0] for r in cursor.fetchall()]
+
+    cursor.execute("SELECT DISTINCT analista FROM historico WHERE analista IS NOT NULL ORDER BY analista")
+    analistas = [r[0] for r in cursor.fetchall()]
+
+    cursor.execute("SELECT DISTINCT cliente FROM historico WHERE cliente IS NOT NULL ORDER BY cliente")
+    clientes = [r[0] for r in cursor.fetchall()]
+
+    conexao.close()
+    return tipos, analistas, clientes
 
 def limpar_historico_db():
     conexao = sqlite3.connect(DB_PATH)
@@ -1186,18 +1262,23 @@ def limpar_historico_db():
 @app.route("/login", methods=["GET", "POST"])
 def login():
     erro = None
+    ip_cliente = obter_ip_cliente()
 
     if request.method == "POST":
+        bloqueado, minutos_restantes = ip_esta_bloqueado(ip_cliente)
+        if bloqueado:
+            erro = f"Muitas tentativas invalidas. Tente novamente em {minutos_restantes} minuto(s)."
+            return render_template("login.html", erro=erro)
+
         usuario = request.form.get("usuario", "").strip()
         senha = request.form.get("senha", "").strip()
-
         if usuario == APP_USER and senha == APP_PASSWORD:
+            limpar_tentativas_login(ip_cliente)
             token = secrets.token_urlsafe(32)
             TOKENS_LOGIN[token] = {
                 "usuario": usuario,
                 "analista": APP_ANALYST_NAME
             }
-
             resposta = make_response(redirect(url_for("index")))
             resposta.set_cookie(
                 "soc_auth",
@@ -1205,9 +1286,9 @@ def login():
                 httponly=True,
                 samesite="Lax"
             )
-
             return resposta
 
+        registrar_falha_login(ip_cliente)
         erro = "Usuário ou senha inválidos."
 
     return render_template("login.html", erro=erro)
@@ -1577,12 +1658,41 @@ def historico():
     if bloqueio:
         return bloqueio
 
-    registros = carregar_historico_db(limite=50)
+    pagina = request.args.get("pagina", 1, type=int)
+    if pagina < 1:
+        pagina = 1
+
+    tipo_filtro = request.args.get("tipo", "").strip() or None
+    analista_filtro = request.args.get("analista", "").strip() or None
+    cliente_filtro = request.args.get("cliente", "").strip() or None
+
+    por_pagina = 20
+    offset = (pagina - 1) * por_pagina
+
+    registros, total = carregar_historico_db(
+        limite=por_pagina,
+        offset=offset,
+        tipo=tipo_filtro,
+        analista=analista_filtro,
+        cliente=cliente_filtro
+    )
+
+    total_paginas = max(1, (total + por_pagina - 1) // por_pagina)
+    tipos_disponiveis, analistas_disponiveis, clientes_disponiveis = obter_opcoes_filtro_historico()
 
     return render_template(
         "historico.html",
         historico=registros,
-        analista=obter_analista_logado()
+        analista=obter_analista_logado(),
+        pagina=pagina,
+        total_paginas=total_paginas,
+        total_registros=total,
+        tipo_filtro=tipo_filtro or "",
+        analista_filtro=analista_filtro or "",
+        cliente_filtro=cliente_filtro or "",
+        tipos_disponiveis=tipos_disponiveis,
+        analistas_disponiveis=analistas_disponiveis,
+        clientes_disponiveis=clientes_disponiveis
     )
 
 @app.route("/clientes", methods=["GET"])
