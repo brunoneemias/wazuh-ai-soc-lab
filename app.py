@@ -8,7 +8,7 @@ import sqlite3
 from datetime import datetime, timedelta
 from collections import Counter
 from dotenv import load_dotenv
-from flask import Flask, render_template, request, redirect, url_for, send_file, make_response
+from flask import Flask, render_template, request, redirect, url_for, send_file, make_response, jsonify
 from requests.auth import HTTPBasicAuth
 from openai import OpenAI
 
@@ -1292,6 +1292,44 @@ def login():
         erro = "Usuário ou senha inválidos."
 
     return render_template("login.html", erro=erro)
+
+@app.route("/health", methods=["GET"])
+def health():
+    status = {
+        "app": "ok",
+        "database": "unknown",
+        "wazuh_indexer": "unknown"
+    }
+    codigo_http = 200
+
+    try:
+        conexao = sqlite3.connect(DB_PATH, timeout=3)
+        conexao.execute("SELECT 1")
+        conexao.close()
+        status["database"] = "ok"
+    except Exception as e:
+        status["database"] = f"erro: {e}"
+        codigo_http = 503
+
+    try:
+        resposta = requests.get(
+            f"{INDEXER_URL}/_cluster/health",
+            auth=(WAZUH_USER, WAZUH_PASSWORD),
+            verify=False,
+            timeout=5
+        )
+        if resposta.status_code == 200:
+            status["wazuh_indexer"] = "ok"
+        else:
+            status["wazuh_indexer"] = f"erro: HTTP {resposta.status_code}"
+            codigo_http = 503
+    except Exception as e:
+        status["wazuh_indexer"] = f"erro: {e}"
+        codigo_http = 503
+
+    status["timestamp"] = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+
+    return jsonify(status), codigo_http
 
 @app.route("/", methods=["GET", "POST"])
 def index():
