@@ -9,6 +9,10 @@ from datetime import datetime, timedelta
 from collections import Counter
 from dotenv import load_dotenv
 from flask import Flask, render_template, request, redirect, url_for, send_file, make_response, jsonify
+import time
+import logging
+from logging.handlers import RotatingFileHandler
+from werkzeug.exceptions import HTTPException
 from requests.auth import HTTPBasicAuth
 from openai import OpenAI
 
@@ -54,6 +58,31 @@ client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 requests.packages.urllib3.disable_warnings()
 
+LOG_DIR = os.path.join(BASE_DIR, "logs")
+os.makedirs(LOG_DIR, exist_ok=True)
+
+logger = logging.getLogger("ai_soc_lab")
+logger.setLevel(logging.INFO)
+
+formato_log = logging.Formatter(
+    "%(asctime)s | %(levelname)s | %(message)s",
+    datefmt="%d/%m/%Y %H:%M:%S"
+)
+
+handler_arquivo = RotatingFileHandler(
+    os.path.join(LOG_DIR, "app.log"),
+    maxBytes=5 * 1024 * 1024,
+    backupCount=5,
+    encoding="utf-8"
+)
+handler_arquivo.setFormatter(formato_log)
+logger.addHandler(handler_arquivo)
+
+handler_console = logging.StreamHandler()
+handler_console.setFormatter(formato_log)
+logger.addHandler(handler_console)
+
+
 app = Flask(__name__)
 #app.secret_key = os.getenv("FLASK_SECRET_KEY", "troque-essa-chave-em-producao")
 
@@ -64,7 +93,31 @@ def injetar_links_dashboards():
         ndr_dashboard_url=NDR_DASHBOARD_URL,
         sysmon_dashboard_url=SYSMON_DASHBOARD_URL
     )
+@app.before_request
+def log_inicio_requisicao():
+    request.inicio_tempo = time.time()
 
+
+@app.after_request
+def log_fim_requisicao(response):
+    try:
+        duracao_ms = int((time.time() - request.inicio_tempo) * 1000)
+    except Exception:
+        duracao_ms = -1
+
+    logger.info(
+        f"{request.remote_addr} | {request.method} {request.path} | "
+        f"status={response.status_code} | {duracao_ms}ms | analista={obter_analista_logado()}"
+    )
+    return response
+
+
+@app.errorhandler(Exception)
+def tratar_erro_global(erro):
+    if isinstance(erro, HTTPException):
+        return erro
+    logger.exception(f"Erro nao tratado em {request.path}")
+    return jsonify({"erro": "Erro interno no servidor. Verifique os logs em logs/app.log"}), 500
 
 # Histórico em memória para evitar problemas de session/cookie
 HISTORICO = []
@@ -258,13 +311,15 @@ def obter_reputacao_ip(ip, max_idade_horas=24):
                             (ip, score, pais, total_reports, agora))
         conexao.commit()
         conexao.close()
-
+        
         return {"ip": ip, "privado": False, "score": score, "pais": pais, "total_reports": total_reports, "cache": False}
 
     except Exception as e:
         conexao.close()
+        logger.exception(f"Erro ao consultar reputacao do IP {ip}")
         return {"ip": ip, "privado": False, "erro": str(e)}
 
+     
 def coletar_alertas(limite=30):
     query = {
         "size": limite,
