@@ -319,8 +319,8 @@ def obter_reputacao_ip(ip, max_idade_horas=24):
         logger.exception(f"Erro ao consultar reputacao do IP {ip}")
         return {"ip": ip, "privado": False, "erro": str(e)}
 
-     
-def coletar_alertas(limite=30):
+
+def coletar_alertas(limite=30, filtro_agente=None):     
     query = {
         "size": limite,
         "sort": [
@@ -365,18 +365,41 @@ def coletar_alertas(limite=30):
             "location"
         ],
 
-        "query": {
-            "bool": {
-                "should": [
-                    {"match": {"rule.groups": "suricata"}},
-                    {"match": {"rule.groups": "sshd"}},
-                    {"match": {"rule.groups": "syscheck"}},
-                    {"match": {"rule.id": "5712"}},
-                    {"match": {"rule.id": "5710"}},
-                    {"match": {"data.win.system.channel": "Microsoft-Windows-Sysmon/Operational"}}
-                ],
-                "minimum_should_match": 1
-            }
+       "query": {
+            "bool": (
+                {
+                    "must": [
+                        {"match": {"agent.name": filtro_agente}}
+                    ],
+                    "filter": [
+                        {
+                            "bool": {
+                                "should": [
+                                    {"match": {"rule.groups": "suricata"}},
+                                    {"match": {"rule.groups": "sshd"}},
+                                    {"match": {"rule.groups": "syscheck"}},
+                                    {"match": {"rule.id": "5712"}},
+                                    {"match": {"rule.id": "5710"}},
+                                    {"match": {"data.win.system.channel": "Microsoft-Windows-Sysmon/Operational"}}
+                                ],
+                                "minimum_should_match": 1
+                            }
+                        }
+                    ]
+                }
+                if filtro_agente else
+                {
+                    "should": [
+                        {"match": {"rule.groups": "suricata"}},
+                        {"match": {"rule.groups": "sshd"}},
+                        {"match": {"rule.groups": "syscheck"}},
+                        {"match": {"rule.id": "5712"}},
+                        {"match": {"rule.id": "5710"}},
+                        {"match": {"data.win.system.channel": "Microsoft-Windows-Sysmon/Operational"}}
+                    ],
+                    "minimum_should_match": 1
+                }
+            )
         }
     }
 
@@ -484,6 +507,25 @@ def resumo_lote(eventos):
 
     cliente_predominante = max(contagem, key=contagem.get)
     return cliente_predominante, mais_recente
+
+def coletar_alertas_por_agente(limite_por_agente=100):
+    """
+    Coleta alertas balanceados por agente — evita que um agente muito
+    barulhento (ex: notebook em uso diario) esconda os outros clientes
+    na tela de visao multi-tenant.
+    """
+    mapa_clientes = carregar_clientes_map()
+    todos_eventos = []
+
+    for agente in mapa_clientes.keys():
+        try:
+            eventos_agente = coletar_alertas(limite=limite_por_agente, filtro_agente=agente)
+            todos_eventos.extend(eventos_agente)
+        except Exception:
+            continue
+
+    return todos_eventos
+
 
 # =========================
 # ESTATÍSTICAS POR CLIENTE (MULTI-TENANT)
@@ -1795,7 +1837,7 @@ def clientes():
         return bloqueio
 
     try:
-        eventos = coletar_alertas(limite=100)
+        eventos = coletar_alertas_por_agente(limite_por_agente=100)
         stats = estatisticas_por_cliente(eventos)
     except Exception as e:
         stats = []
