@@ -29,10 +29,14 @@ O projeto evoluiu de um laboratório simples de Wazuh para um protótipo de **mi
 - Histórico persistente em SQLite;
 - Identificação do analista logado;
 - Download de evidências;
-- Visão multi-tenant simulada (por cliente);
+- Visão multi-tenant simulada (por cliente), com cadastro editável via banco de dados;
 - Painel de SLA simulado (TTD/TTR);
+- Enriquecimento de IPs com Threat Intelligence (AbuseIPDB);
+- Rate limiting no login e endpoint de health check;
+- Logging estruturado com rotação de arquivo;
 - Dashboard NDR;
 - Dashboard Windows/Sysmon;
+- Scripts de automação para geração de eventos de teste;
 - Página de apresentação do projeto.
 
 ---
@@ -436,10 +440,6 @@ Funções disponíveis no menu:
 > gerar_playbook_incidente()
 > correlacionar_incidente()
 > analisar_sysmon()
-> visualizar_clientes()
-> visualizar_sla()
-> sobre_projeto()
-> visualizar_historico()
 > baixar_relatorio_ia.md
 > baixar_relatorio_executivo.md
 > baixar_playbook.md
@@ -447,7 +447,18 @@ Funções disponíveis no menu:
 > baixar_analise_sysmon.md
 > baixar_alertas.json
 > baixar_historico_soc.db
+> abrir_dashboard_ndr()
+> abrir_dashboard_sysmon()
+> visualizar_clientes()
+> gerenciar_clientes()
+> visualizar_sla()
+> consultar_threat_intel()
+> sobre_projeto()
+> visualizar_historico()
+> limpar_historico()
 ```
+
+O menu lateral é organizado em seções colapsáveis (Consultas Rápidas, Análises IA, Downloads, Dashboards e Sistema), com o botão de logout fixo no topo, sempre visível.
 
 ---
 
@@ -489,6 +500,42 @@ O projeto calcula duas métricas operacionais a partir de timestamps reais regis
 Essas métricas são exibidas por cliente, simulando o tipo de SLA que uma operação SOCaaS real acompanha e reporta para seus clientes.
 
 > São métricas simuladas de laboratório, calculadas em cima de timestamps reais — não um SLA contratual de produção.
+
+---
+
+### 13. Cadastro de Clientes via Banco de Dados
+
+O mapeamento de agente → cliente, inicialmente fixo no código, foi migrado para uma tabela própria (`clientes_map`) no SQLite, com tela de gerenciamento dedicada:
+
+```text
+/clientes/gerenciar
+```
+
+A tela permite:
+
+- Adicionar um novo mapeamento (agente + nome do cliente);
+- Atualizar um mapeamento existente;
+- Remover um mapeamento (com confirmação).
+
+Na primeira execução, a tabela é populada automaticamente a partir de um seed inicial — depois disso, toda a gestão é feita pela interface, sem precisar editar código.
+
+---
+
+### 14. Threat Intelligence (AbuseIPDB)
+
+Os IPs de origem mais frequentes nos alertas recentes são enriquecidos com reputação externa via API da AbuseIPDB:
+
+```text
+/threat-intel
+```
+
+Características:
+
+- IPs de rede privada (RFC 1918) são identificados automaticamente e **não** são consultados (não faz sentido buscar reputação pública de um IP interno);
+- Resultados são armazenados em cache no SQLite (tabela `ip_reputacao`) por 24h, evitando estourar o limite gratuito da API;
+- Score de reputação (0-100) é exibido com destaque visual (baixo/suspeito/alto risco).
+
+> Como o laboratório roda inteiramente em rede interna, a maioria dos IPs aparece como "IP privado — não consultado". A funcionalidade foi validada com IPs públicos reais (ex: 8.8.8.8) antes de ser integrada.
 
 ---
 
@@ -682,6 +729,37 @@ APP_ANALYST_NAME=Bruno Neemias
 
 ---
 
+## 🛡️ Segurança e Observabilidade
+
+### Rate Limiting no Login
+
+Para mitigar tentativas de força bruta contra a própria aplicação, o `/login` implementa um controle simples em memória:
+
+- Após **5 tentativas inválidas** do mesmo IP em **5 minutos**, o IP é bloqueado temporariamente por **5 minutos**;
+- Login correto reseta o contador imediatamente;
+- Tentativa durante o bloqueio nem chega a validar usuário/senha — apenas informa o tempo restante.
+
+> Por ser em memória, o controle é reiniciado a cada restart da aplicação. Em produção, o ideal seria persistir isso em Redis ou banco, para sobreviver a reinicializações e funcionar com múltiplas instâncias.
+
+### Health Check
+
+```text
+/health
+```
+
+Endpoint sem autenticação (para uso por ferramentas externas de monitoramento) que testa:
+
+- Conectividade com o SQLite;
+- Conectividade com o Wazuh Indexer (`/_cluster/health`).
+
+Retorna JSON com o status de cada componente e código HTTP `200` (saudável) ou `503` (algum componente indisponível).
+
+### Logging Estruturado
+
+Toda requisição é registrada em `logs/app.log` (arquivo rotativo, até 5MB por arquivo, 5 backups), incluindo IP de origem, rota, método, status HTTP, tempo de resposta e analista logado. Erros não tratados são capturados globalmente e logados com stack trace completo, sem expor detalhes internos na resposta ao usuário.
+
+---
+
 ## 📄 Página Sobre o Projeto
 
 Foi criada a rota:
@@ -725,13 +803,20 @@ wazuh-ai-soc-lab/
 │   ├── playbook_incidente.md
 │   ├── correlacao_soc.md
 │   └── analise_sysmon.md
+├── logs/
+│   └── app.log
 ├── templates/
 │   ├── index.html
 │   ├── login.html
 │   ├── historico.html
 │   ├── clientes.html
+│   ├── clientes_gerenciar.html
+│   ├── threat_intel.html
 │   ├── sla.html
 │   └── sobre.html
+├── scripts/
+│   ├── demo_eventos_kali.sh
+│   └── demo_eventos_windows.ps1
 ├── legacy_cli/
 │   ├── coletar_alertas.py
 │   ├── gerar_relatorio.py
@@ -757,7 +842,7 @@ wazuh-ai-soc-lab/
     └── 10_downloads.png
 ```
 
-> Observação: `data/`, `output/`, `.env` e evidências sensíveis ficam no `.gitignore` e não devem ser publicados com dados reais.
+> Observação: `data/`, `output/`, `logs/`, `.env` e evidências sensíveis ficam no `.gitignore` e não devem ser publicados com dados reais.
 
 > `app.py` é a aplicação Flask atual, autossuficiente. `legacy_cli/` guarda a primeira versão do projeto (pipeline via linha de comando), mantida como registro da evolução do laboratório.
 
@@ -812,6 +897,7 @@ __pycache__/
 *.log
 *.bkp
 *.zip
+logs/
 
 data/
 output/
@@ -880,7 +966,41 @@ powershell -Command "Get-Process | Select-Object -First 5"
 curl http://IP_DO_KALI
 ```
 
-> Os testes acima são executados manualmente. A criação de scripts de automação para gerar esses eventos está listada na seção de Melhorias Futuras.
+---
+
+## 🧪 Scripts de Demonstração
+
+Os testes acima foram automatizados em dois scripts, um para cada endpoint.
+
+### Script Kali
+
+```text
+scripts/demo_eventos_kali.sh
+```
+
+Gera, em sequência: tentativas de SSH brute force, scan de rede (Nmap SYN + versão, com timeout para evitar travamentos por filtragem de firewall), ciclo completo de eventos FIM (criação, alteração, permissão, exclusão) e tráfego ICMP.
+
+Execução:
+
+```bash
+chmod +x scripts/demo_eventos_kali.sh
+./scripts/demo_eventos_kali.sh [IP_DO_WAZUH]
+```
+
+### Script Windows
+
+```text
+scripts/demo_eventos_windows.ps1
+```
+
+Gera: criação de processos (Sysmon Event ID 1), execução de PowerShell e `cmd.exe`, tentativa de conexão HTTP e consulta DNS.
+
+Execução:
+
+```powershell
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
+.\demo_eventos_windows.ps1 -KaliIP IP_DO_KALI -WazuhIP IP_DO_WAZUH
+```
 
 ---
 
@@ -954,15 +1074,18 @@ Sequência sugerida para apresentação:
 9. Gerar `gerar_playbook_incidente()`;
 10. Gerar `gerar_relatorio_executivo()` e comparar com o relatório técnico;
 11. Abrir `visualizar_clientes()` e mostrar a visão multi-tenant;
-12. Abrir `visualizar_sla()` e mostrar TTD/TTR por cliente;
-13. Abrir `visualizar_historico()`;
-14. Mostrar o analista `Bruno Neemias` registrado no histórico;
-15. Baixar relatório ou evidência.
+12. Abrir `gerenciar_clientes()` e mostrar o cadastro editável de clientes;
+13. Abrir `visualizar_sla()` e mostrar TTD/TTR por cliente;
+14. Abrir `consultar_threat_intel()` e mostrar o enriquecimento de IPs;
+15. Abrir `visualizar_historico()`, aplicar um filtro e navegar entre páginas;
+16. Mostrar o analista `Bruno Neemias` registrado no histórico;
+17. Baixar relatório ou evidência;
+18. Mostrar `/health` respondendo o status da aplicação.
 
 Fluxo demonstrado:
 
 ```text
-Detectar → Correlacionar → Analisar com IA → Mapear MITRE → Gerar Playbook → Comunicar (técnico + executivo) → Medir SLA → Exportar Evidência → Auditar Histórico
+Detectar → Correlacionar → Analisar com IA → Mapear MITRE → Gerar Playbook → Comunicar (técnico + executivo) → Medir SLA → Enriquecer com Threat Intel → Exportar Evidência → Auditar Histórico
 ```
 
 ---
@@ -1002,8 +1125,15 @@ Detectar → Correlacionar → Analisar com IA → Mapear MITRE → Gerar Playbo
 - ✅ Correlação automática de eventos
 - ✅ Mapeamento MITRE ATT&CK
 - ✅ Exportação de evidências
-- ✅ Multi-tenant simulado (visão por cliente)
+- ✅ Multi-tenant simulado (visão por cliente), com cadastro editável via banco
 - ✅ Painel de SLA simulado (TTD/TTR) por cliente
+- ✅ Threat Intelligence com AbuseIPDB (score de reputação, cache em banco)
+- ✅ Rate limiting no login
+- ✅ Health check (`/health`)
+- ✅ Logging estruturado com rotação de arquivo
+- ✅ Filtros e paginação no histórico
+- ✅ Scripts de automação para geração de eventos de teste
+- ✅ Menu com seções colapsáveis e logout fixo no topo
 
 ---
 
@@ -1035,17 +1165,16 @@ A IA não substitui o analista, mas atua como apoio para reduzir o tempo de aná
 - [ ] Integração com VirusTotal
 - [ ] Notificações via Telegram, Discord ou e-mail
 - [ ] Criação automática de tickets
-- [ ] Enriquecimento de IPs com threat intelligence
 - [ ] Autenticação multiusuário
 - [ ] Controle de permissões por perfil
-- [ ] Histórico com filtros por data/tipo/analista
 - [ ] Deploy via Docker
 - [ ] Exportação em PDF
 - [ ] Relatórios em HTML
 - [ ] Integração com Active Response para ações semi-automatizadas
 - [ ] Página de incidentes com status de tratamento
 - [ ] Habilitar Event ID 3 (Network Connection) no Sysmon do Windows para adicionar painel de conexões de rede
-- [ ] Scripts de automação para geração de eventos de teste (Kali e Windows)
+- [ ] Persistir rate limiting em Redis/banco (hoje é em memória, reseta a cada restart)
+- [ ] GIF/vídeo curto de demonstração para o README
 
 ---
 
@@ -1077,8 +1206,8 @@ Projeto desenvolvido como laboratório acadêmico e prático de segurança defen
 
 O laboratório demonstra a evolução de um ambiente Wazuh tradicional para uma arquitetura mais completa, integrando telemetria de rede, Linux, Windows e IA — e, mais recentemente, para uma prova de conceito de operação SOCaaS.
 
-A solução final permite que um analista SOC consulte alertas, gere relatórios técnicos e executivos, crie playbooks, correlacione eventos, mapeie técnicas MITRE ATT&CK, visualize histórico persistente, acompanhe múltiplos clientes simulados, monitore métricas de SLA e baixe evidências diretamente por uma interface web.
+A solução final permite que um analista SOC consulte alertas, gere relatórios técnicos e executivos, crie playbooks, correlacione eventos, mapeie técnicas MITRE ATT&CK, visualize histórico persistente com filtros e paginação, acompanhe múltiplos clientes simulados (com cadastro editável), monitore métricas de SLA, enriqueça IPs com Threat Intelligence e baixe evidências diretamente por uma interface web — com rate limiting, health check e logging estruturado dando suporte operacional por trás.
 
 O projeto simula um cenário corporativo de produção em laboratório e demonstra na prática conceitos de:
 
-`SIEM` · `XDR` · `NDR` · `FIM` · `Sysmon` · `Active Response` · `Threat Hunting` · `Incident Response` · `SOC Automation` · `MITRE ATT&CK` · `SOCaaS` · `AI-assisted Security Operations`
+`SIEM` · `XDR` · `NDR` · `FIM` · `Sysmon` · `Active Response` · `Threat Hunting` · `Threat Intelligence` · `Incident Response` · `SOC Automation` · `MITRE ATT&CK` · `SOCaaS` · `AI-assisted Security Operations`
