@@ -629,7 +629,7 @@ Exemplos de técnicas mapeadas:
 |---|---|---|
 | T1110 | Brute Force | Tentativas repetidas de autenticação SSH |
 | T1046 | Network Service Discovery | Scans ou reconhecimento de rede |
-| T1059.001 | PowerShell | Execução de PowerShell no endpoint Windows |
+| T1059.001 | PowerShell | Execução de PowerShell no endpoint Windows (validado com Atomic Red Team) |
 | T1059.003 | Windows Command Shell | Execução de `cmd.exe` |
 | T1105 | Ingress Tool Transfer | Uso de HTTP/curl/wget/SimpleHTTP |
 | T1070 | Indicator Removal | Exclusão/limpeza de arquivos ou rastros |
@@ -639,6 +639,53 @@ Exemplos de técnicas mapeadas:
 Regra aplicada:
 
 > A IA só deve mapear técnicas MITRE quando houver evidência suficiente nos alertas. Caso contrário, deve informar que o mapeamento não foi identificado com segurança.
+
+---
+
+## 🧨 Validação de Detecção com Atomic Red Team
+
+Para validar que as técnicas mapeadas na tabela acima são realmente detectadas (e não apenas documentadas em teoria), o projeto passou a utilizar o [Atomic Red Team](https://github.com/redcanaryco/atomic-red-team) — uma biblioteca de testes de detecção mantida pela comunidade e mapeada oficialmente no MITRE ATT&CK, com mais de 340 técnicas disponíveis.
+
+### Ambiente de teste isolado
+
+Os testes ofensivos **não são executados no endpoint principal**. Foi criada uma VM Windows 11 dedicada (`Windows11-LabVM`, cadastrada como **Cliente C - H-tek Solutions** no multi-tenant simulado), isolada especificamente para esse propósito:
+
+- Snapshot limpo tirado antes de qualquer execução de teste, permitindo reverter em segundos;
+- Exclusão de pasta configurada no Windows Defender apenas para o diretório do Atomic Red Team, evitando interferência durante os testes;
+- Sysmon e Wazuh Agent configurados de forma idêntica ao endpoint principal, garantindo que a telemetria capturada seja comparável.
+
+### Metodologia
+
+```powershell
+# Listar testes disponíveis para uma técnica
+Invoke-AtomicTest T1059.001 -ShowDetailsBrief
+
+# Ver detalhes de um teste especifico antes de executar
+Invoke-AtomicTest T1059.001 -TestNumbers 17 -ShowDetails
+
+# Executar o teste
+Invoke-AtomicTest T1059.001 -TestNumbers 17
+```
+
+### Teste validado: T1059.001 (PowerShell)
+
+O teste **"PowerShell Command Execution"** (Atomic Test #17, originado do 2021 Threat Detection Report da Red Canary) executa um comando PowerShell codificado em Base64, sem exigir elevação de privilégio nem download de ferramenta externa — seguro o suficiente para validação em laboratório.
+
+Fluxo de validação:
+
+```text
+Atomic Red Team executa o teste
+        ↓
+Sysmon captura a execução do PowerShell
+        ↓
+Wazuh Agent envia o evento para o Manager
+        ↓
+Evento aparece em wazuh-alerts-*
+        ↓
+IA analisa e mapeia corretamente para T1059.001
+```
+
+> Nem todo teste da biblioteca é seguro para rodar sem critério — vários dependem de ferramentas externas reais (ex: Mimikatz, BloodHound/SharpHound) ou exigem infraestrutura de domínio (Active Directory). Antes de executar qualquer teste, o comando `-ShowDetails` é usado para revisar o que será executado.
 
 ---
 
@@ -1134,6 +1181,7 @@ Detectar → Correlacionar → Analisar com IA → Mapear MITRE → Gerar Playbo
 - ✅ Filtros e paginação no histórico
 - ✅ Scripts de automação para geração de eventos de teste
 - ✅ Menu com seções colapsáveis e logout fixo no topo
+- ✅ Validação de detecção com Atomic Red Team (T1059.001)
 
 ---
 
