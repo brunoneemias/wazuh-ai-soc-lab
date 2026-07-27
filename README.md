@@ -12,13 +12,52 @@
 
 ---
 
+## 📑 Sumário
+
+- [Visão Geral](#-visão-geral)
+- [Objetivo do Projeto](#-objetivo-do-projeto)
+- [Arquitetura do Ambiente](#-arquitetura-do-ambiente)
+- [Componentes Utilizados](#-componentes-utilizados)
+- [Funcionalidades Implementadas](#-funcionalidades-implementadas)
+- [Fluxo da IA](#-fluxo-da-ia)
+- [O que a IA faz](#-o-que-a-ia-faz)
+- [Motor de Correlação](#-motor-de-correlação)
+- [MITRE ATT&CK](#-mitre-attck)
+- [Validação de Detecção com Atomic Red Team](#-validação-de-detecção-com-atomic-red-team)
+- [Playbook de Resposta](#-playbook-de-resposta)
+- [Histórico Persistente com SQLite](#️-histórico-persistente-com-sqlite)
+- [Login Simples no Flask](#-login-simples-no-flask)
+- [Segurança e Observabilidade](#️-segurança-e-observabilidade)
+- [Página Sobre o Projeto](#-página-sobre-o-projeto)
+- [Estrutura do Projeto](#-estrutura-do-projeto)
+- [Instalação](#️-instalação)
+- [Como Executar](#️-como-executar)
+- [Como Gerar Alertas para Teste](#-como-gerar-alertas-para-teste)
+- [Scripts de Demonstração](#-scripts-de-demonstração)
+- [Consultas Úteis no Wazuh](#-consultas-úteis-no-wazuh)
+- [Acesso aos Dashboards](#-acesso-aos-dashboards)
+- [Downloads pela Interface](#-downloads-pela-interface)
+- [Exemplos de Perguntas para a IA](#-exemplos-de-perguntas-para-a-ia)
+- [Roteiro de Demonstração](#-roteiro-de-demonstração)
+- [Capturas de Tela](#️-capturas-de-tela)
+- [Resultados Obtidos](#-resultados-obtidos)
+- [Valor para um SOC](#-valor-para-um-soc)
+- [Possíveis Melhorias Futuras](#-possíveis-melhorias-futuras)
+- [Observações de Segurança](#️-observações-de-segurança)
+- [Autor](#-autor)
+- [Conclusão](#-conclusão)
+
+> Se algum link acima não pular corretamente, passe o mouse sobre o título de destino no GitHub e use o ícone de link (🔗) que aparece à esquerda dele para pegar a âncora exata.
+
+---
+
 ## 📌 Visão Geral
 
-Este projeto apresenta a construção de um laboratório de segurança defensiva utilizando o **Wazuh** como plataforma central de SIEM/XDR, integrado com **Suricata IDS/NDR**, **Sysmon no Windows**, **FIM**, detecção de brute force SSH, Active Response, dashboards operacionais e uma interface web com **Inteligência Artificial** para análise automatizada de alertas.
+Este projeto implementa uma plataforma de segurança defensiva utilizando o **Wazuh** como núcleo de SIEM/XDR, integrado a **Suricata IDS/NDR**, **Sysmon no Windows**, **FIM**, detecção de brute force SSH, Active Response, dashboards operacionais e uma interface web com **Inteligência Artificial** para análise automatizada de alertas.
 
-A proposta é simular um ambiente corporativo monitorado por um SOC, onde eventos de rede, endpoint Linux, endpoint Windows e integridade de arquivos são centralizados no Wazuh e analisados por um assistente de IA.
+A proposta é reproduzir um ambiente corporativo monitorado por um SOC, onde eventos de rede, endpoint Linux, endpoint Windows e integridade de arquivos são centralizados no Wazuh e analisados por um assistente de IA.
 
-O projeto evoluiu de um laboratório simples de Wazuh para um protótipo de **mini SOC/XDR com IA**, e mais recentemente para uma **prova de conceito de SOCaaS (Security Operations Center as a Service)**, capaz de gerar:
+O projeto evoluiu de uma implantação básica do Wazuh para uma solução de **mini SOC/XDR com IA** e, mais recentemente, para uma **prova de conceito de SOCaaS (Security Operations Center as a Service)**, com:
 
 - Relatórios SOC automatizados (técnico e executivo);
 - Playbooks de resposta a incidentes;
@@ -43,21 +82,19 @@ O projeto evoluiu de um laboratório simples de Wazuh para um protótipo de **mi
 
 ## 🎯 Objetivo do Projeto
 
-O objetivo principal é demonstrar como o Wazuh pode ser utilizado como base para um ambiente de monitoramento de segurança, integrando diferentes fontes de telemetria e utilizando IA para auxiliar o analista SOC na triagem, investigação, documentação e resposta a incidentes.
+O objetivo é demonstrar como o Wazuh pode servir de base para um ambiente de monitoramento de segurança, integrando diferentes fontes de telemetria e utilizando IA para apoiar o analista SOC na triagem, investigação, documentação e resposta a incidentes.
 
-O projeto busca responder perguntas como:
+Casos de uso cobertos pela plataforma:
 
-- Houve tentativa de brute force SSH?
-- Quais IPs estão envolvidos nos alertas?
-- Existem eventos de rede suspeitos?
-- Houve alteração de arquivos monitorados?
-- Existem eventos Sysmon no Windows?
-- Quais processos e command lines foram observados?
-- Qual seria a severidade do incidente?
-- Quais técnicas MITRE ATT&CK podem estar relacionadas?
-- Quais ações o SOC deveria tomar?
-- Quais automações podem ser aplicadas?
-- Como um mesmo ambiente Wazuh poderia atender múltiplos clientes (SOCaaS)?
+- Detecção de tentativas de brute force SSH;
+- Identificação de IPs envolvidos em alertas e sua reputação;
+- Detecção de eventos de rede suspeitos;
+- Monitoramento de alteração de arquivos;
+- Análise de eventos Sysmon no Windows (processos e command lines);
+- Classificação de severidade de incidentes;
+- Mapeamento para técnicas MITRE ATT&CK;
+- Recomendação de ações de resposta do SOC;
+- Operação multi-cliente (SOCaaS) a partir de um único ambiente Wazuh.
 
 ---
 
@@ -351,6 +388,9 @@ Configuração adicionada ao agente Wazuh no Windows:
 
 Campos adicionados à coleta Python:
 
+<details>
+<summary>Ver lista completa de campos</summary>
+
 ```text
 data.win.system.eventID
 data.win.system.channel
@@ -367,6 +407,8 @@ data.win.eventdata.sourceIp
 data.win.eventdata.sourcePort
 data.win.eventdata.queryName
 ```
+
+</details>
 
 ---
 
@@ -438,6 +480,9 @@ A interface permite:
 
 Funções disponíveis no menu:
 
+<details>
+<summary>Ver lista completa de comandos do menu</summary>
+
 ```text
 > resumo_alertas()
 > detectar_bruteforce()
@@ -466,6 +511,8 @@ Funções disponíveis no menu:
 > visualizar_historico()
 > limpar_historico()
 ```
+
+</details>
 
 O menu lateral é organizado em seções colapsáveis (Consultas Rápidas, Análises IA, Downloads, Dashboards e Sistema), com o botão de logout fixo no topo, sempre visível.
 
@@ -1197,36 +1244,14 @@ Detectar → Correlacionar → Analisar com IA → Mapear MITRE → Gerar Playbo
 
 ## 📌 Resultados Obtidos
 
-- ✅ Coleta de alertas do Wazuh via Indexer
-- ✅ Integração Suricata com Wazuh
-- ✅ Detecção de tráfego suspeito
-- ✅ Detecção de brute force SSH
-- ✅ Monitoramento de integridade de arquivos
-- ✅ Coleta de eventos Windows/Sysmon
-- ✅ Dashboard NDR (13 painéis, com mapa de calor, gauge e filtro interativo)
-- ✅ Dashboard Windows/Sysmon (12 painéis, com mapa de calor parent-child)
-- ✅ Dashboard de Inventário de Ativos (11 painéis, incluindo tag cloud e gauge de portas de risco)
-- ✅ Chat IA para análise de alertas
-- ✅ Login simples
-- ✅ Página Sobre o Projeto
-- ✅ Histórico persistente em SQLite
-- ✅ Identificação do analista logado
-- ✅ Geração de relatórios SOC (técnico e executivo)
-- ✅ Geração de playbooks
-- ✅ Correlação automática de eventos
-- ✅ Mapeamento MITRE ATT&CK
-- ✅ Exportação de evidências
-- ✅ Multi-tenant simulado (visão por cliente), com cadastro editável via banco
-- ✅ Painel de SLA simulado (TTD/TTR) por cliente
-- ✅ Threat Intelligence com AbuseIPDB (score de reputação, cache em banco)
-- ✅ Rate limiting no login
-- ✅ Health check (`/health`)
-- ✅ Logging estruturado com rotação de arquivo
-- ✅ Filtros e paginação no histórico
-- ✅ Scripts de automação para geração de eventos de teste
-- ✅ Ambiente isolado de testes ofensivos (VM dedicada com snapshot) validado com Atomic Red Team (T1059.001)
-- ✅ Menu com seções colapsáveis e logout fixo no topo
-- ✅ Dashboard de Inventário de Ativos com visão de superfície de ataque (portas de risco)
+Resumo do que está funcionando de ponta a ponta (detalhe completo de cada item nas seções acima):
+
+- ✅ **Detecção e telemetria**: alertas via Wazuh Indexer, Suricata (NDR), brute force SSH, FIM, eventos Windows/Sysmon, mapeamento MITRE ATT&CK validado com Atomic Red Team
+- ✅ **3 dashboards operacionais**: NDR (13 painéis), Windows/Sysmon (12 painéis) e Inventário de Ativos (11 painéis) — todos com filtro interativo, mapas de calor, gauges e tema escuro
+- ✅ **IA e automação SOC**: chat interativo, relatórios técnico e executivo, playbooks, correlação automática de eventos, histórico persistente com filtros/paginação
+- ✅ **Recursos de SOCaaS**: multi-tenant com cadastro editável via banco, painel de SLA (TTD/TTR), Threat Intelligence com AbuseIPDB
+- ✅ **Segurança e operação da aplicação**: login com rate limiting, health check, logging estruturado com rotação, exportação de evidências
+- ✅ **Portfólio**: scripts de automação de teste, ambiente isolado para testes ofensivos (VM com snapshot), menu com seções colapsáveis
 
 ---
 
@@ -1273,7 +1298,7 @@ A IA não substitui o analista, mas atua como apoio para reduzir o tempo de aná
 
 ## ⚠️ Observações de Segurança
 
-Este projeto foi desenvolvido para fins educacionais e deve ser executado em **ambiente controlado**.
+Este é um ambiente de laboratório/teste e deve ser executado em **ambiente controlado**, não exposto diretamente à internet.
 
 Recomendações:
 
@@ -1289,7 +1314,7 @@ Recomendações:
 
 **Bruno Neemias**
 
-Projeto desenvolvido como laboratório acadêmico e prático de segurança defensiva, com foco em SIEM, SOC, NDR, XDR, Sysmon, Active Response e Inteligência Artificial aplicada à análise de alertas.
+Projeto de segurança defensiva com foco em SIEM, SOC, NDR, XDR, Sysmon, Active Response e Inteligência Artificial aplicada à análise de alertas, desenvolvido para explorar na prática arquiteturas de SOCaaS.
 
 [LinkedIn](https://linkedin.com/in/brunoneemias) [GitHub](https://github.com/brunoneemias)
 
@@ -1297,10 +1322,8 @@ Projeto desenvolvido como laboratório acadêmico e prático de segurança defen
 
 ## 🏁 Conclusão
 
-O laboratório demonstra a evolução de um ambiente Wazuh tradicional para uma arquitetura mais completa, integrando telemetria de rede, Linux, Windows e IA — e, mais recentemente, para uma prova de conceito de operação SOCaaS.
+O projeto evoluiu de um ambiente Wazuh tradicional para uma arquitetura mais completa, integrando telemetria de rede, Linux, Windows e IA — e, mais recentemente, para uma prova de conceito de operação SOCaaS. O foco não foi empilhar ferramentas, mas construir uma camada de automação e análise própria em cima de uma base de SIEM sólida, validada com testes reais de detecção (Atomic Red Team).
 
-A solução final permite que um analista SOC consulte alertas, gere relatórios técnicos e executivos, crie playbooks, correlacione eventos, mapeie técnicas MITRE ATT&CK, visualize histórico persistente com filtros e paginação, acompanhe múltiplos clientes simulados (com cadastro editável), monitore métricas de SLA, enriqueça IPs com Threat Intelligence e baixe evidências diretamente por uma interface web — com rate limiting, health check e logging estruturado dando suporte operacional por trás.
-
-O projeto simula um cenário corporativo de produção em laboratório e demonstra na prática conceitos de:
+A plataforma reproduz um cenário corporativo de produção e coloca em prática conceitos de:
 
 `SIEM` · `XDR` · `NDR` · `FIM` · `Sysmon` · `Active Response` · `Threat Hunting` · `Threat Intelligence` · `Incident Response` · `SOC Automation` · `MITRE ATT&CK` · `SOCaaS` · `AI-assisted Security Operations`
