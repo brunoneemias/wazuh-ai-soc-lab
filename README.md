@@ -299,16 +299,20 @@ Painéis criados:
 
 | Painel | Tipo | Campo |
 |---|---|---|
+| Filtro por Agente | Controls | `agent.name` (filtra o dashboard inteiro) |
+| Descrição | Markdown | — |
 | Total de Alertas Suricata | Metric | Contagem (`rule.groups: suricata`) |
+| Gauge Alertas Críticos | Gauge | Contagem (`data.alert.severity: 1`) |
 | Alertas ao Longo do Tempo | Area Chart | `timestamp` |
+| Mapa de Calor IP x Assinatura | Heat Map | `data.src_ip` × `data.alert.signature` |
 | Top 10 Assinaturas IDS | Horizontal Bar | `data.alert.signature` |
 | Top IPs de Origem | Horizontal Bar | `data.src_ip` |
 | Top IPs de Destino | Horizontal Bar | `data.dest_ip` |
 | Distribuição por Protocolo | Donut | `data.proto` |
 | Categoria de Ataque | Donut | `data.alert.category` |
 | Severidade dos Alertas | Pie | `data.alert.severity` |
-| Top Portas de Destino | Data Table | `data.dest_port` |
 | Alertas por Agente | Bar | `agent.name` |
+| Top Portas de Destino | Data Table | `data.dest_port` |
 
 Filtro principal:
 
@@ -316,7 +320,7 @@ Filtro principal:
 rule.groups: suricata
 ```
 
-> Os painéis de IP de origem/destino excluem endereços de rede irrelevantes para investigação (link-local, multicast, broadcast) para manter o foco em hosts reais.
+> Os painéis de IP de origem/destino excluem endereços de rede irrelevantes para investigação (link-local, multicast, broadcast) para manter o foco em hosts reais. O mapa de calor cruza IP de origem com assinatura disparada, revelando qual host está associado a qual tipo de comportamento — informação que os gráficos individuais não mostram isoladamente.
 
 ---
 
@@ -380,13 +384,16 @@ Painéis criados:
 
 | Painel | Tipo | Campo |
 |---|---|---|
+| Filtro por Agente | Controls | `agent.name` (filtra o dashboard inteiro) |
+| Descrição | Markdown | — |
 | Total de Eventos Sysmon | Metric | Contagem |
+| Gauge Eventos Críticos | Gauge | Contagem (`rule.level >= 8`) |
 | Eventos ao Longo do Tempo | Area Chart | `timestamp` |
+| Mapa de Calor Parent-Child | Heat Map | `data.win.eventdata.image` × `data.win.eventdata.parentImage` |
 | Severidade dos Eventos | Donut | `rule.level` |
 | Eventos por Event ID | Donut | `data.win.system.eventID` |
 | Usuários | Donut | `data.win.eventdata.user` |
 | Top Processos Executados | Horizontal Bar | `data.win.eventdata.image` |
-| Top Parent Process | Horizontal Bar | `data.win.eventdata.parentImage` |
 | Regras Mais Acionadas | Horizontal Bar | `rule.description` |
 | Top Command Lines | Data Table | `data.win.eventdata.commandLine` |
 
@@ -395,6 +402,8 @@ Filtro principal:
 ```text
 data.win.system.channel: "Microsoft-Windows-Sysmon/Operational"
 ```
+
+> O mapa de calor Parent-Child substituiu o gráfico simples de "Top Parent Process" — ao cruzar processo pai e processo filho na mesma visualização, revela cadeias de execução (ex: `powershell.exe` gerado por `cmd.exe`), que é a base de qualquer investigação de Detection Engineering.
 
 > Um painel de Conexões de Rede (Event ID 3) estava planejado, mas o Sysmon neste host não está configurado para capturar esse tipo de evento — ver seção de Melhorias Futuras.
 
@@ -536,6 +545,34 @@ Características:
 - Score de reputação (0-100) é exibido com destaque visual (baixo/suspeito/alto risco).
 
 > Como o laboratório roda inteiramente em rede interna, a maioria dos IPs aparece como "IP privado — não consultado". A funcionalidade foi validada com IPs públicos reais (ex: 8.8.8.8) antes de ser integrada.
+
+---
+
+### 15. Dashboard de Inventário de Ativos
+
+Além dos alertas de segurança, o Wazuh coleta continuamente o **inventário de cada agente** através do módulo Syscollector — pacotes instalados, portas abertas, processos em execução, usuários locais e patches aplicados. Foi criado um terceiro dashboard dedicado a essa visão:
+
+```text
+Inventario de Ativos - AI SOC Lab
+```
+
+Painéis criados:
+
+| Painel | Tipo | Índice / Campo |
+|---|---|---|
+| Filtro por Agente | Controls | `agent.name` |
+| Descrição | Markdown | — |
+| Total de Pacotes | Metric | `wazuh-states-inventory-packages-*` |
+| Pacotes por Agente | Donut | `agent.name` |
+| Gauge Portas de Risco | Gauge | Portas sensíveis abertas (21, 23, 139, 445, 3389, 5900) |
+| Sistemas Operacionais | Data Table | `host.os.name`, `host.architecture` |
+| Nuvem de Pacotes | Tag Cloud | `package.name` |
+| Mapa de Calor de Processos | Heat Map | `process.name` × `agent.name` |
+| Portas Abertas | Data Table | `agent.name`, `process.name`, `source.port` |
+| Usuários Locais | Data Table | `agent.name`, `user.name` |
+| Hotfixes Instalados | Data Table | `agent.name`, `package.hotfix.name` |
+
+> Esse dashboard usa os índices `wazuh-states-inventory-*`, diferentes de `wazuh-alerts-*` — não são eventos de segurança, e sim o **estado atual** de cada ativo monitorado. O Gauge de Portas de Risco funciona como indicador de superfície de ataque: mostra em tempo real quantas portas classicamente sensíveis estão expostas, independente de ter havido algum alerta sobre elas.
 
 ---
 
@@ -879,14 +916,13 @@ wazuh-ai-soc-lab/
 └── prints/
     ├── 01_login.png
     ├── 02_sobre_projeto.png
-    ├── 03_chat_ia.png
-    ├── 04_dashboard_ndr.png
-    ├── 05_dashboard_sysmon.png
-    ├── 06_relatorio_ia_mitre.png
-    ├── 07_playbook.png
-    ├── 08_correlacao.png
-    ├── 09_historico_sqlite.png
-    └── 10_downloads.png
+    ├── 03_SLA.png
+    ├── 04_dashboard_sysmon.png
+    ├── 05_dashboard_inventario.png
+    ├── 06_dashboard_NDR.png
+    ├── 07_Clientes.png
+    ├── 08_historico.png
+    └── 09_chat_ia.png
 ```
 
 > Observação: `data/`, `output/`, `logs/`, `.env` e evidências sensíveis ficam no `.gitignore` e não devem ser publicados com dados reais.
@@ -1072,8 +1108,9 @@ Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
 
 - **NDR Dashboard**: `https://IP_DO_WAZUH_SERVER/app/dashboards` → *NDR Dashboard - AI SOC Lab*
 - **Windows Endpoint / Sysmon**: `https://IP_DO_WAZUH_SERVER/app/dashboards` → *Windows Endpoint / Sysmon - AI SOC Lab*
+- **Inventário de Ativos**: `https://IP_DO_WAZUH_SERVER/app/dashboards` → *Inventario de Ativos - AI SOC Lab*
 
-> O IP é da rede interna do laboratório e pode variar conforme o ambiente. Ambos os dashboards utilizam tema escuro e uma combinação de gráficos de área, rosca, barras horizontais e tabelas.
+> O IP é da rede interna do laboratório e pode variar conforme o ambiente. Os três dashboards utilizam tema escuro e uma combinação de gráficos de área, rosca, barras horizontais, tabelas, mapas de calor, tag cloud e gauges, todos com filtro interativo por agente no topo.
 
 ---
 
@@ -1139,16 +1176,22 @@ Detectar → Correlacionar → Analisar com IA → Mapear MITRE → Gerar Playbo
 
 ## 🖼️ Capturas de Tela
 
+### Login
+![Login](prints/01_login.png)
+
 ### Dashboard NDR
-![NDR Dashboard](prints/04_dashboard_ndr.png)
+![NDR Dashboard](prints/06_dashboard_NDR.png)
 
 ### Dashboard Windows/Sysmon
-![Sysmon Dashboard](prints/05_dashboard_sysmon.png)
+![Sysmon Dashboard](prints/04_dashboard_sysmon.png)
 
-### Chat IA com Mapeamento MITRE ATT&CK
-![Relatório IA](prints/06_relatorio_ia_mitre.png)
+### Dashboard de Inventário de Ativos
+![Inventario Dashboard](prints/05_dashboard_inventario.png)
 
-> Demais capturas (login, playbook, correlação, histórico, downloads) disponíveis na pasta [`/prints`](prints/).
+### Chat IA
+![Chat IA](prints/09_chat_ia.png)
+
+> Demais capturas (Sobre o Projeto, SLA, Clientes, Histórico) disponíveis na pasta [`/prints`](prints/).
 
 ---
 
@@ -1160,8 +1203,9 @@ Detectar → Correlacionar → Analisar com IA → Mapear MITRE → Gerar Playbo
 - ✅ Detecção de brute force SSH
 - ✅ Monitoramento de integridade de arquivos
 - ✅ Coleta de eventos Windows/Sysmon
-- ✅ Dashboard NDR (10 painéis)
-- ✅ Dashboard Windows/Sysmon (9 painéis)
+- ✅ Dashboard NDR (13 painéis, com mapa de calor, gauge e filtro interativo)
+- ✅ Dashboard Windows/Sysmon (12 painéis, com mapa de calor parent-child)
+- ✅ Dashboard de Inventário de Ativos (11 painéis, incluindo tag cloud e gauge de portas de risco)
 - ✅ Chat IA para análise de alertas
 - ✅ Login simples
 - ✅ Página Sobre o Projeto
@@ -1180,8 +1224,9 @@ Detectar → Correlacionar → Analisar com IA → Mapear MITRE → Gerar Playbo
 - ✅ Logging estruturado com rotação de arquivo
 - ✅ Filtros e paginação no histórico
 - ✅ Scripts de automação para geração de eventos de teste
+- ✅ Ambiente isolado de testes ofensivos (VM dedicada com snapshot) validado com Atomic Red Team (T1059.001)
 - ✅ Menu com seções colapsáveis e logout fixo no topo
-- ✅ Validação de detecção com Atomic Red Team (T1059.001)
+- ✅ Dashboard de Inventário de Ativos com visão de superfície de ataque (portas de risco)
 
 ---
 
