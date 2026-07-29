@@ -1390,6 +1390,22 @@ def login():
 
     return render_template("login.html", erro=erro)
 
+@app.route("/api/cliente/<agente>", methods=["GET"])
+def api_cliente(agente):
+    """
+    Endpoint simples de consulta, pra uso por sistemas externos (ex: Shuffle SOAR).
+    Retorna o cliente mapeado para um agente, ou 'Nao classificado' se nao houver mapeamento.
+    """
+    try:
+        mapa = carregar_clientes_map()
+        cliente = mapa.get(agente, CLIENTE_PADRAO)
+        return jsonify({"agente": agente, "cliente": cliente}), 200
+    except Exception as e:
+        return jsonify({"agente": agente, "cliente": CLIENTE_PADRAO, "erro": str(e)}), 200
+
+
+@app.route("/health", methods=["GET"])
+
 @app.route("/health", methods=["GET"])
 def health():
     status = {
