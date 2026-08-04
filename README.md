@@ -75,6 +75,8 @@ O projeto evoluiu de uma implantação básica do Wazuh para uma solução de **
 - Logging estruturado com rotação de arquivo;
 - Dashboard NDR;
 - Dashboard Windows/Sysmon;
+- Dashboard de Inventário de Ativos;
+- Automação de resposta via SOAR (Shuffle), com notificação por Discord e Telegram;
 - Scripts de automação para geração de eventos de teste;
 - Página de apresentação do projeto.
 
@@ -179,6 +181,14 @@ Casos de uso cobertos pela plataforma:
 - SQLite;
 - HTML/CSS;
 - Interface estilo terminal/SOC.
+
+### SOAR
+
+- Shuffle (orquestração de resposta);
+- Servidor Debian 12 dedicado;
+- Docker + Docker Swarm;
+- Discord (Webhooks/Embeds);
+- Telegram Bot API (botões inline, notificação condicional).
 
 ---
 
@@ -620,6 +630,93 @@ Painéis criados:
 | Hotfixes Instalados | Data Table | `agent.name`, `package.hotfix.name` |
 
 > Esse dashboard usa os índices `wazuh-states-inventory-*`, diferentes de `wazuh-alerts-*` — não são eventos de segurança, e sim o **estado atual** de cada ativo monitorado. O Gauge de Portas de Risco funciona como indicador de superfície de ataque: mostra em tempo real quantas portas classicamente sensíveis estão expostas, independente de ter havido algum alerta sobre elas.
+
+---
+
+### 16. SOAR - Automação de Resposta com Shuffle
+
+Para fechar o ciclo de detecção → notificação sem intervenção manual, o projeto integra o Wazuh a uma camada de **SOAR (Security Orchestration, Automation and Response)** usando o [Shuffle](https://shuffler.io/), rodando num **servidor Linux dedicado** (Debian 12, hardware próprio, separado do restante do laboratório).
+
+#### Arquitetura da integração
+
+```text
+Wazuh Manager (wazuh-integratord)
+        ↓ webhook (alertas nivel >= 8, JSON)
+Shuffle (servidor Debian dedicado, Docker + Swarm)
+        ↓
+Consulta a API do proprio AI SOC Assistant (/api/cliente/<agente>)
+        ↓
+Identifica o cliente (multi-tenant) responsavel pelo alerta
+        ↓
+        ├── Discord (embed colorido, sempre notifica)
+        └── Telegram (botoes inline, silencioso para alertas de rotina)
+```
+
+#### Configuração no Wazuh (`ossec.conf`)
+
+```xml
+<integration>
+  <name>shuffle</name>
+  <hook_url>http://IP_DO_SHUFFLE:3001/api/v1/hooks/SEU_WEBHOOK_ID</hook_url>
+  <level>8</level>
+  <alert_format>json</alert_format>
+</integration>
+```
+
+O `wazuh-integratord` (processo nativo do Wazuh Manager) envia automaticamente, via POST, todo alerta que bater o filtro de nível configurado.
+
+#### API de consulta de cliente
+
+Foi criado um endpoint dedicado no `app.py`, sem autenticação (mesmo padrão do `/health`), para uso exclusivo por sistemas externos como o Shuffle:
+
+```text
+GET /api/cliente/<agente>
+```
+
+Retorna o cliente mapeado (reaproveitando `carregar_clientes_map()`, a mesma função usada na tela `/clientes/gerenciar`):
+
+```json
+{"agente": "Windows_11", "cliente": "Cliente A - TechCorp Solutions"}
+```
+
+#### Notificação no Discord (embed)
+
+Usa a API de Webhooks do Discord com **embed** colorido, mais legível que texto puro:
+
+```json
+{
+  "embeds": [{
+    "title": "🚨 Alerta Wazuh",
+    "color": 15158332,
+    "fields": [
+      {"name": "Cliente", "value": "$consultar_cliente.body.cliente", "inline": true},
+      {"name": "Agente", "value": "$exec.all_fields.agent.name", "inline": true},
+      {"name": "Nível", "value": "$exec.all_fields.rule.level", "inline": true},
+      {"name": "Regra", "value": "$exec.title", "inline": false}
+    ],
+    "footer": {"text": "AI SOC Lab - Wazuh"}
+  }]
+}
+```
+
+#### Notificação no Telegram (bot próprio, com roteamento por severidade)
+
+Um bot criado via `@BotFather` recebe as notificações com botões inline (link direto para o Dashboard e para o AI SOC Assistant). O workflow no Shuffle **ramifica em duas condições** a partir do nível do alerta:
+
+| Condição | Nível | Comportamento |
+|---|---|---|
+| Crítico | `rule.level > 7` | Notificação com som, emoji 🔴, 2 botões (Dashboard + AI SOC Assistant) |
+| Rotina | `rule.level < 8` | Notificação **silenciosa** (`disable_notification: true`), emoji 🟢, 1 botão |
+
+Isso evita fadiga de alerta no celular — só o que é realmente crítico interrompe o usuário.
+
+#### Ambiente de execução do Shuffle
+
+- Servidor **Debian 12** dedicado (hardware próprio reaproveitado), sem interface gráfica;
+- **Docker** nativo + **Docker Swarm** (necessário para o Shuffle orquestrar os workers de execução de cada bloco do workflow);
+- Rede em **Bridged Adapter** direto no roteador, isolado das VMs do laboratório principal.
+
+> Rodar o Shuffle via Docker Desktop no Windows (WSL2) foi tentado primeiro, mas a combinação Swarm + WSL2 se mostrou instável (erros de rede interna do Docker). A migração para um servidor Linux dedicado resolveu de forma definitiva — reflexo de uma decisão de arquitetura tomada durante o próprio desenvolvimento, documentada aqui como aprendizado prático de infraestrutura.
 
 ---
 
@@ -1250,6 +1347,7 @@ Resumo do que está funcionando de ponta a ponta (detalhe completo de cada item 
 - ✅ **3 dashboards operacionais**: NDR (13 painéis), Windows/Sysmon (12 painéis) e Inventário de Ativos (11 painéis) — todos com filtro interativo, mapas de calor, gauges e tema escuro
 - ✅ **IA e automação SOC**: chat interativo, relatórios técnico e executivo, playbooks, correlação automática de eventos, histórico persistente com filtros/paginação
 - ✅ **Recursos de SOCaaS**: multi-tenant com cadastro editável via banco, painel de SLA (TTD/TTR), Threat Intelligence com AbuseIPDB
+- ✅ **SOAR**: automação de resposta com Shuffle, servidor Linux dedicado, notificação por Discord (embed) e Telegram (bot próprio, botões inline, roteamento por severidade)
 - ✅ **Segurança e operação da aplicação**: login com rate limiting, health check, logging estruturado com rotação, exportação de evidências
 - ✅ **Portfólio**: scripts de automação de teste, ambiente isolado para testes ofensivos (VM com snapshot), menu com seções colapsáveis
 
@@ -1276,22 +1374,22 @@ A IA não substitui o analista, mas atua como apoio para reduzir o tempo de aná
 
 ## 🚀 Possíveis Melhorias Futuras
 
-- [ ] Integração com Shuffle SOAR
 - [ ] Integração com TheHive
 - [ ] Integração com Cortex
 - [ ] Integração com MISP
 - [ ] Integração com VirusTotal
-- [ ] Notificações via Telegram, Discord ou e-mail
 - [ ] Criação automática de tickets
 - [ ] Autenticação multiusuário
 - [ ] Controle de permissões por perfil
-- [ ] Deploy via Docker
 - [ ] Exportação em PDF
 - [ ] Relatórios em HTML
-- [ ] Integração com Active Response para ações semi-automatizadas
+- [ ] Integração com Active Response para bloqueio automático a partir do Shuffle (fechar o ciclo detectar → responder → executar)
 - [ ] Página de incidentes com status de tratamento
 - [ ] Habilitar Event ID 3 (Network Connection) no Sysmon do Windows para adicionar painel de conexões de rede
 - [ ] Persistir rate limiting em Redis/banco (hoje é em memória, reseta a cada restart)
+- [ ] Formatar timestamp das notificações em padrão brasileiro (limitação de acesso a índice de array identificada no builder visual do Shuffle)
+- [ ] Fixar mensagens críticas no topo do chat do Telegram (`pinChatMessage`)
+- [ ] Deploy via Docker Compose para o restante da aplicação (hoje só o Shuffle roda em container)
 - [ ] GIF/vídeo curto de demonstração para o README
 
 ---
@@ -1322,8 +1420,8 @@ Projeto de segurança defensiva com foco em SIEM, SOC, NDR, XDR, Sysmon, Active 
 
 ## 🏁 Conclusão
 
-O projeto evoluiu de um ambiente Wazuh tradicional para uma arquitetura mais completa, integrando telemetria de rede, Linux, Windows e IA — e, mais recentemente, para uma prova de conceito de operação SOCaaS. O foco não foi empilhar ferramentas, mas construir uma camada de automação e análise própria em cima de uma base de SIEM sólida, validada com testes reais de detecção (Atomic Red Team).
+O projeto evoluiu de um ambiente Wazuh tradicional para uma arquitetura mais completa, integrando telemetria de rede, Linux, Windows e IA — e, mais recentemente, para uma prova de conceito de operação SOCaaS com automação de resposta via SOAR. O foco não foi empilhar ferramentas, mas construir uma camada de automação e análise própria em cima de uma base de SIEM sólida, validada com testes reais de detecção (Atomic Red Team) e fechando o ciclo detectar → analisar → notificar sem intervenção manual.
 
 A plataforma reproduz um cenário corporativo de produção e coloca em prática conceitos de:
 
-`SIEM` · `XDR` · `NDR` · `FIM` · `Sysmon` · `Active Response` · `Threat Hunting` · `Threat Intelligence` · `Incident Response` · `SOC Automation` · `MITRE ATT&CK` · `SOCaaS` · `AI-assisted Security Operations`
+`SIEM` · `XDR` · `NDR` · `FIM` · `Sysmon` · `Active Response` · `Threat Hunting` · `Threat Intelligence` · `Incident Response` · `SOC Automation` · `SOAR` · `MITRE ATT&CK` · `SOCaaS` · `AI-assisted Security Operations`
