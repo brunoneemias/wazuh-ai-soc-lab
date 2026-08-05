@@ -710,6 +710,50 @@ Um bot criado via `@BotFather` recebe as notificações com botões inline (link
 
 Isso evita fadiga de alerta no celular — só o que é realmente crítico interrompe o usuário.
 
+#### Resposta automática (Active Response nativo do Wazuh)
+
+Além de notificar, o Wazuh Manager foi configurado para **agir sozinho** em caso de brute force SSH confirmado, sem depender do Shuffle para a ação em si — o Shuffle entra apenas para **comunicar** que uma ação já foi tomada.
+
+```xml
+<active-response>
+  <disabled>no</disabled>
+  <command>firewall-drop</command>
+  <location>local</location>
+  <rules_id>5712,5710</rules_id>
+  <timeout>600</timeout>
+</active-response>
+```
+
+Fluxo completo quando a regra `5712` (brute force SSH) dispara:
+
+```text
+Wazuh detecta brute force (regra 5712, nivel 10)
+        ↓
+wazuh-execd aciona o comando "firewall-drop"
+        ↓
+IP de origem e bloqueado via iptables no proprio host (bloqueio por 10 minutos)
+        ↓
+Webhook dispara para o Shuffle (mesmo fluxo de notificacao)
+        ↓
+Workflow verifica se rule_id == 5712
+        ↓
+Envia notificacao DIFERENCIADA: "🔒 IP Bloqueado Automaticamente"
+(em vez do alerta generico) para Discord e Telegram
+```
+
+Exemplo do Body usado na notificação de bloqueio (Telegram):
+
+```json
+{
+  "chat_id": "SEU_CHAT_ID",
+  "text": "🔒 <b>IP Bloqueado Automaticamente</b>\n\nCliente: $consultar_cliente.body.cliente\nAgente Atacado: $exec.all_fields.agent.name\nAção: firewall-drop (iptables)\nDuração: 10 minutos\nRegra: $exec.title",
+  "parse_mode": "HTML",
+  "reply_markup": {"inline_keyboard": [[{"text": "📊 Dashboard", "url": "URL_DASHBOARD"}, {"text": "🤖 AI SOC Assistant", "url": "URL_APP"}]]}
+}
+```
+
+> O `iptables` precisou ser instalado manualmente no servidor (`dnf install iptables`) — a imagem base do Wazuh Server não vinha com nenhuma ferramenta de firewall instalada, algo só percebido ao inspecionar `/var/ossec/logs/active-responses.log` após o primeiro teste sem sucesso.
+
 #### Ambiente de execução do Shuffle
 
 - Servidor **Debian 12** dedicado (hardware próprio reaproveitado), sem interface gráfica;
@@ -1347,7 +1391,7 @@ Resumo do que está funcionando de ponta a ponta (detalhe completo de cada item 
 - ✅ **3 dashboards operacionais**: NDR (13 painéis), Windows/Sysmon (12 painéis) e Inventário de Ativos (11 painéis) — todos com filtro interativo, mapas de calor, gauges e tema escuro
 - ✅ **IA e automação SOC**: chat interativo, relatórios técnico e executivo, playbooks, correlação automática de eventos, histórico persistente com filtros/paginação
 - ✅ **Recursos de SOCaaS**: multi-tenant com cadastro editável via banco, painel de SLA (TTD/TTR), Threat Intelligence com AbuseIPDB
-- ✅ **SOAR**: automação de resposta com Shuffle, servidor Linux dedicado, notificação por Discord (embed) e Telegram (bot próprio, botões inline, roteamento por severidade)
+- ✅ **SOAR**: automação de resposta com Shuffle, servidor Linux dedicado, notificação por Discord (embed) e Telegram (bot próprio, botões inline, roteamento por severidade), com Active Response nativo bloqueando IPs automaticamente via `firewall-drop` e notificação diferenciada quando uma ação é tomada
 - ✅ **Segurança e operação da aplicação**: login com rate limiting, health check, logging estruturado com rotação, exportação de evidências
 - ✅ **Portfólio**: scripts de automação de teste, ambiente isolado para testes ofensivos (VM com snapshot), menu com seções colapsáveis
 
@@ -1383,7 +1427,7 @@ A IA não substitui o analista, mas atua como apoio para reduzir o tempo de aná
 - [ ] Controle de permissões por perfil
 - [ ] Exportação em PDF
 - [ ] Relatórios em HTML
-- [ ] Integração com Active Response para bloqueio automático a partir do Shuffle (fechar o ciclo detectar → responder → executar)
+- [ ] Estender Active Response para outros tipos de ataque além de brute force SSH (hoje só regras 5710/5712)
 - [ ] Página de incidentes com status de tratamento
 - [ ] Habilitar Event ID 3 (Network Connection) no Sysmon do Windows para adicionar painel de conexões de rede
 - [ ] Persistir rate limiting em Redis/banco (hoje é em memória, reseta a cada restart)
