@@ -12,13 +12,52 @@
 
 ---
 
+## 📑 Sumário
+
+- [Visão Geral](#-visão-geral)
+- [Objetivo do Projeto](#-objetivo-do-projeto)
+- [Arquitetura do Ambiente](#-arquitetura-do-ambiente)
+- [Componentes Utilizados](#-componentes-utilizados)
+- [Funcionalidades Implementadas](#-funcionalidades-implementadas)
+- [Fluxo da IA](#-fluxo-da-ia)
+- [O que a IA faz](#-o-que-a-ia-faz)
+- [Motor de Correlação](#-motor-de-correlação)
+- [MITRE ATT&CK](#-mitre-attck)
+- [Validação de Detecção com Atomic Red Team](#-validação-de-detecção-com-atomic-red-team)
+- [Playbook de Resposta](#-playbook-de-resposta)
+- [Histórico Persistente com SQLite](#️-histórico-persistente-com-sqlite)
+- [Login Simples no Flask](#-login-simples-no-flask)
+- [Segurança e Observabilidade](#️-segurança-e-observabilidade)
+- [Página Sobre o Projeto](#-página-sobre-o-projeto)
+- [Estrutura do Projeto](#-estrutura-do-projeto)
+- [Instalação](#️-instalação)
+- [Como Executar](#️-como-executar)
+- [Como Gerar Alertas para Teste](#-como-gerar-alertas-para-teste)
+- [Scripts de Demonstração](#-scripts-de-demonstração)
+- [Consultas Úteis no Wazuh](#-consultas-úteis-no-wazuh)
+- [Acesso aos Dashboards](#-acesso-aos-dashboards)
+- [Downloads pela Interface](#-downloads-pela-interface)
+- [Exemplos de Perguntas para a IA](#-exemplos-de-perguntas-para-a-ia)
+- [Roteiro de Demonstração](#-roteiro-de-demonstração)
+- [Capturas de Tela](#️-capturas-de-tela)
+- [Resultados Obtidos](#-resultados-obtidos)
+- [Valor para um SOC](#-valor-para-um-soc)
+- [Possíveis Melhorias Futuras](#-possíveis-melhorias-futuras)
+- [Observações de Segurança](#️-observações-de-segurança)
+- [Autor](#-autor)
+- [Conclusão](#-conclusão)
+
+> Se algum link acima não pular corretamente, passe o mouse sobre o título de destino no GitHub e use o ícone de link (🔗) que aparece à esquerda dele para pegar a âncora exata.
+
+---
+
 ## 📌 Visão Geral
 
-Este projeto apresenta a construção de um laboratório de segurança defensiva utilizando o **Wazuh** como plataforma central de SIEM/XDR, integrado com **Suricata IDS/NDR**, **Sysmon no Windows**, **FIM**, detecção de brute force SSH, Active Response, dashboards operacionais e uma interface web com **Inteligência Artificial** para análise automatizada de alertas.
+Este projeto implementa uma plataforma de segurança defensiva utilizando o **Wazuh** como núcleo de SIEM/XDR, integrado a **Suricata IDS/NDR**, **Sysmon no Windows**, **FIM**, detecção de brute force SSH, Active Response, dashboards operacionais e uma interface web com **Inteligência Artificial** para análise automatizada de alertas.
 
-A proposta é simular um ambiente corporativo monitorado por um SOC, onde eventos de rede, endpoint Linux, endpoint Windows e integridade de arquivos são centralizados no Wazuh e analisados por um assistente de IA.
+A proposta é reproduzir um ambiente corporativo monitorado por um SOC, onde eventos de rede, endpoint Linux, endpoint Windows e integridade de arquivos são centralizados no Wazuh e analisados por um assistente de IA.
 
-O projeto evoluiu de um laboratório simples de Wazuh para um protótipo de **mini SOC/XDR com IA**, e mais recentemente para uma **prova de conceito de SOCaaS (Security Operations Center as a Service)**, capaz de gerar:
+O projeto evoluiu de uma implantação básica do Wazuh para uma solução de **mini SOC/XDR com IA** e, mais recentemente, para uma **prova de conceito de SOCaaS (Security Operations Center as a Service)**, com:
 
 - Relatórios SOC automatizados (técnico e executivo);
 - Playbooks de resposta a incidentes;
@@ -36,6 +75,8 @@ O projeto evoluiu de um laboratório simples de Wazuh para um protótipo de **mi
 - Logging estruturado com rotação de arquivo;
 - Dashboard NDR;
 - Dashboard Windows/Sysmon;
+- Dashboard de Inventário de Ativos;
+- Automação de resposta via SOAR (Shuffle), com notificação por Discord e Telegram;
 - Scripts de automação para geração de eventos de teste;
 - Página de apresentação do projeto.
 
@@ -43,21 +84,19 @@ O projeto evoluiu de um laboratório simples de Wazuh para um protótipo de **mi
 
 ## 🎯 Objetivo do Projeto
 
-O objetivo principal é demonstrar como o Wazuh pode ser utilizado como base para um ambiente de monitoramento de segurança, integrando diferentes fontes de telemetria e utilizando IA para auxiliar o analista SOC na triagem, investigação, documentação e resposta a incidentes.
+O objetivo é demonstrar como o Wazuh pode servir de base para um ambiente de monitoramento de segurança, integrando diferentes fontes de telemetria e utilizando IA para apoiar o analista SOC na triagem, investigação, documentação e resposta a incidentes.
 
-O projeto busca responder perguntas como:
+Casos de uso cobertos pela plataforma:
 
-- Houve tentativa de brute force SSH?
-- Quais IPs estão envolvidos nos alertas?
-- Existem eventos de rede suspeitos?
-- Houve alteração de arquivos monitorados?
-- Existem eventos Sysmon no Windows?
-- Quais processos e command lines foram observados?
-- Qual seria a severidade do incidente?
-- Quais técnicas MITRE ATT&CK podem estar relacionadas?
-- Quais ações o SOC deveria tomar?
-- Quais automações podem ser aplicadas?
-- Como um mesmo ambiente Wazuh poderia atender múltiplos clientes (SOCaaS)?
+- Detecção de tentativas de brute force SSH;
+- Identificação de IPs envolvidos em alertas e sua reputação;
+- Detecção de eventos de rede suspeitos;
+- Monitoramento de alteração de arquivos;
+- Análise de eventos Sysmon no Windows (processos e command lines);
+- Classificação de severidade de incidentes;
+- Mapeamento para técnicas MITRE ATT&CK;
+- Recomendação de ações de resposta do SOC;
+- Operação multi-cliente (SOCaaS) a partir de um único ambiente Wazuh.
 
 ---
 
@@ -142,6 +181,14 @@ O projeto busca responder perguntas como:
 - SQLite;
 - HTML/CSS;
 - Interface estilo terminal/SOC.
+
+### SOAR
+
+- Shuffle (orquestração de resposta);
+- Servidor Debian 12 dedicado;
+- Docker + Docker Swarm;
+- Discord (Webhooks/Embeds);
+- Telegram Bot API (botões inline, notificação condicional).
 
 ---
 
@@ -299,16 +346,20 @@ Painéis criados:
 
 | Painel | Tipo | Campo |
 |---|---|---|
+| Filtro por Agente | Controls | `agent.name` (filtra o dashboard inteiro) |
+| Descrição | Markdown | — |
 | Total de Alertas Suricata | Metric | Contagem (`rule.groups: suricata`) |
+| Gauge Alertas Críticos | Gauge | Contagem (`data.alert.severity: 1`) |
 | Alertas ao Longo do Tempo | Area Chart | `timestamp` |
+| Mapa de Calor IP x Assinatura | Heat Map | `data.src_ip` × `data.alert.signature` |
 | Top 10 Assinaturas IDS | Horizontal Bar | `data.alert.signature` |
 | Top IPs de Origem | Horizontal Bar | `data.src_ip` |
 | Top IPs de Destino | Horizontal Bar | `data.dest_ip` |
 | Distribuição por Protocolo | Donut | `data.proto` |
 | Categoria de Ataque | Donut | `data.alert.category` |
 | Severidade dos Alertas | Pie | `data.alert.severity` |
-| Top Portas de Destino | Data Table | `data.dest_port` |
 | Alertas por Agente | Bar | `agent.name` |
+| Top Portas de Destino | Data Table | `data.dest_port` |
 
 Filtro principal:
 
@@ -316,7 +367,7 @@ Filtro principal:
 rule.groups: suricata
 ```
 
-> Os painéis de IP de origem/destino excluem endereços de rede irrelevantes para investigação (link-local, multicast, broadcast) para manter o foco em hosts reais.
+> Os painéis de IP de origem/destino excluem endereços de rede irrelevantes para investigação (link-local, multicast, broadcast) para manter o foco em hosts reais. O mapa de calor cruza IP de origem com assinatura disparada, revelando qual host está associado a qual tipo de comportamento — informação que os gráficos individuais não mostram isoladamente.
 
 ---
 
@@ -347,6 +398,9 @@ Configuração adicionada ao agente Wazuh no Windows:
 
 Campos adicionados à coleta Python:
 
+<details>
+<summary>Ver lista completa de campos</summary>
+
 ```text
 data.win.system.eventID
 data.win.system.channel
@@ -364,6 +418,8 @@ data.win.eventdata.sourcePort
 data.win.eventdata.queryName
 ```
 
+</details>
+
 ---
 
 ### 8. Dashboard Windows/Sysmon
@@ -380,13 +436,16 @@ Painéis criados:
 
 | Painel | Tipo | Campo |
 |---|---|---|
+| Filtro por Agente | Controls | `agent.name` (filtra o dashboard inteiro) |
+| Descrição | Markdown | — |
 | Total de Eventos Sysmon | Metric | Contagem |
+| Gauge Eventos Críticos | Gauge | Contagem (`rule.level >= 8`) |
 | Eventos ao Longo do Tempo | Area Chart | `timestamp` |
+| Mapa de Calor Parent-Child | Heat Map | `data.win.eventdata.image` × `data.win.eventdata.parentImage` |
 | Severidade dos Eventos | Donut | `rule.level` |
 | Eventos por Event ID | Donut | `data.win.system.eventID` |
 | Usuários | Donut | `data.win.eventdata.user` |
 | Top Processos Executados | Horizontal Bar | `data.win.eventdata.image` |
-| Top Parent Process | Horizontal Bar | `data.win.eventdata.parentImage` |
 | Regras Mais Acionadas | Horizontal Bar | `rule.description` |
 | Top Command Lines | Data Table | `data.win.eventdata.commandLine` |
 
@@ -395,6 +454,8 @@ Filtro principal:
 ```text
 data.win.system.channel: "Microsoft-Windows-Sysmon/Operational"
 ```
+
+> O mapa de calor Parent-Child substituiu o gráfico simples de "Top Parent Process" — ao cruzar processo pai e processo filho na mesma visualização, revela cadeias de execução (ex: `powershell.exe` gerado por `cmd.exe`), que é a base de qualquer investigação de Detection Engineering.
 
 > Um painel de Conexões de Rede (Event ID 3) estava planejado, mas o Sysmon neste host não está configurado para capturar esse tipo de evento — ver seção de Melhorias Futuras.
 
@@ -429,6 +490,9 @@ A interface permite:
 
 Funções disponíveis no menu:
 
+<details>
+<summary>Ver lista completa de comandos do menu</summary>
+
 ```text
 > resumo_alertas()
 > detectar_bruteforce()
@@ -457,6 +521,8 @@ Funções disponíveis no menu:
 > visualizar_historico()
 > limpar_historico()
 ```
+
+</details>
 
 O menu lateral é organizado em seções colapsáveis (Consultas Rápidas, Análises IA, Downloads, Dashboards e Sistema), com o botão de logout fixo no topo, sempre visível.
 
@@ -536,6 +602,165 @@ Características:
 - Score de reputação (0-100) é exibido com destaque visual (baixo/suspeito/alto risco).
 
 > Como o laboratório roda inteiramente em rede interna, a maioria dos IPs aparece como "IP privado — não consultado". A funcionalidade foi validada com IPs públicos reais (ex: 8.8.8.8) antes de ser integrada.
+
+---
+
+### 15. Dashboard de Inventário de Ativos
+
+Além dos alertas de segurança, o Wazuh coleta continuamente o **inventário de cada agente** através do módulo Syscollector — pacotes instalados, portas abertas, processos em execução, usuários locais e patches aplicados. Foi criado um terceiro dashboard dedicado a essa visão:
+
+```text
+Inventario de Ativos - AI SOC Lab
+```
+
+Painéis criados:
+
+| Painel | Tipo | Índice / Campo |
+|---|---|---|
+| Filtro por Agente | Controls | `agent.name` |
+| Descrição | Markdown | — |
+| Total de Pacotes | Metric | `wazuh-states-inventory-packages-*` |
+| Pacotes por Agente | Donut | `agent.name` |
+| Gauge Portas de Risco | Gauge | Portas sensíveis abertas (21, 23, 139, 445, 3389, 5900) |
+| Sistemas Operacionais | Data Table | `host.os.name`, `host.architecture` |
+| Nuvem de Pacotes | Tag Cloud | `package.name` |
+| Mapa de Calor de Processos | Heat Map | `process.name` × `agent.name` |
+| Portas Abertas | Data Table | `agent.name`, `process.name`, `source.port` |
+| Usuários Locais | Data Table | `agent.name`, `user.name` |
+| Hotfixes Instalados | Data Table | `agent.name`, `package.hotfix.name` |
+
+> Esse dashboard usa os índices `wazuh-states-inventory-*`, diferentes de `wazuh-alerts-*` — não são eventos de segurança, e sim o **estado atual** de cada ativo monitorado. O Gauge de Portas de Risco funciona como indicador de superfície de ataque: mostra em tempo real quantas portas classicamente sensíveis estão expostas, independente de ter havido algum alerta sobre elas.
+
+---
+
+### 16. SOAR - Automação de Resposta com Shuffle
+
+Para fechar o ciclo de detecção → notificação sem intervenção manual, o projeto integra o Wazuh a uma camada de **SOAR (Security Orchestration, Automation and Response)** usando o [Shuffle](https://shuffler.io/), rodando num **servidor Linux dedicado** (Debian 12, hardware próprio, separado do restante do laboratório).
+
+#### Arquitetura da integração
+
+```text
+Wazuh Manager (wazuh-integratord)
+        ↓ webhook (alertas nivel >= 8, JSON)
+Shuffle (servidor Debian dedicado, Docker + Swarm)
+        ↓
+Consulta a API do proprio AI SOC Assistant (/api/cliente/<agente>)
+        ↓
+Identifica o cliente (multi-tenant) responsavel pelo alerta
+        ↓
+        ├── Discord (embed colorido, sempre notifica)
+        └── Telegram (botoes inline, silencioso para alertas de rotina)
+```
+
+#### Configuração no Wazuh (`ossec.conf`)
+
+```xml
+<integration>
+  <name>shuffle</name>
+  <hook_url>http://IP_DO_SHUFFLE:3001/api/v1/hooks/SEU_WEBHOOK_ID</hook_url>
+  <level>8</level>
+  <alert_format>json</alert_format>
+</integration>
+```
+
+O `wazuh-integratord` (processo nativo do Wazuh Manager) envia automaticamente, via POST, todo alerta que bater o filtro de nível configurado.
+
+#### API de consulta de cliente
+
+Foi criado um endpoint dedicado no `app.py`, sem autenticação (mesmo padrão do `/health`), para uso exclusivo por sistemas externos como o Shuffle:
+
+```text
+GET /api/cliente/<agente>
+```
+
+Retorna o cliente mapeado (reaproveitando `carregar_clientes_map()`, a mesma função usada na tela `/clientes/gerenciar`):
+
+```json
+{"agente": "Windows_11", "cliente": "Cliente A - TechCorp Solutions"}
+```
+
+#### Notificação no Discord (embed)
+
+Usa a API de Webhooks do Discord com **embed** colorido, mais legível que texto puro:
+
+```json
+{
+  "embeds": [{
+    "title": "🚨 Alerta Wazuh",
+    "color": 15158332,
+    "fields": [
+      {"name": "Cliente", "value": "$consultar_cliente.body.cliente", "inline": true},
+      {"name": "Agente", "value": "$exec.all_fields.agent.name", "inline": true},
+      {"name": "Nível", "value": "$exec.all_fields.rule.level", "inline": true},
+      {"name": "Regra", "value": "$exec.title", "inline": false}
+    ],
+    "footer": {"text": "AI SOC Lab - Wazuh"}
+  }]
+}
+```
+
+#### Notificação no Telegram (bot próprio, com roteamento por severidade)
+
+Um bot criado via `@BotFather` recebe as notificações com botões inline (link direto para o Dashboard e para o AI SOC Assistant). O workflow no Shuffle **ramifica em duas condições** a partir do nível do alerta:
+
+| Condição | Nível | Comportamento |
+|---|---|---|
+| Crítico | `rule.level > 7` | Notificação com som, emoji 🔴, 2 botões (Dashboard + AI SOC Assistant) |
+| Rotina | `rule.level < 8` | Notificação **silenciosa** (`disable_notification: true`), emoji 🟢, 1 botão |
+
+Isso evita fadiga de alerta no celular — só o que é realmente crítico interrompe o usuário.
+
+#### Resposta automática (Active Response nativo do Wazuh)
+
+Além de notificar, o Wazuh Manager foi configurado para **agir sozinho** em caso de brute force SSH confirmado, sem depender do Shuffle para a ação em si — o Shuffle entra apenas para **comunicar** que uma ação já foi tomada.
+
+```xml
+<active-response>
+  <disabled>no</disabled>
+  <command>firewall-drop</command>
+  <location>local</location>
+  <rules_id>5712,5710</rules_id>
+  <timeout>600</timeout>
+</active-response>
+```
+
+Fluxo completo quando a regra `5712` (brute force SSH) dispara:
+
+```text
+Wazuh detecta brute force (regra 5712, nivel 10)
+        ↓
+wazuh-execd aciona o comando "firewall-drop"
+        ↓
+IP de origem e bloqueado via iptables no proprio host (bloqueio por 10 minutos)
+        ↓
+Webhook dispara para o Shuffle (mesmo fluxo de notificacao)
+        ↓
+Workflow verifica se rule_id == 5712
+        ↓
+Envia notificacao DIFERENCIADA: "🔒 IP Bloqueado Automaticamente"
+(em vez do alerta generico) para Discord e Telegram
+```
+
+Exemplo do Body usado na notificação de bloqueio (Telegram):
+
+```json
+{
+  "chat_id": "SEU_CHAT_ID",
+  "text": "🔒 <b>IP Bloqueado Automaticamente</b>\n\nCliente: $consultar_cliente.body.cliente\nAgente Atacado: $exec.all_fields.agent.name\nAção: firewall-drop (iptables)\nDuração: 10 minutos\nRegra: $exec.title",
+  "parse_mode": "HTML",
+  "reply_markup": {"inline_keyboard": [[{"text": "📊 Dashboard", "url": "URL_DASHBOARD"}, {"text": "🤖 AI SOC Assistant", "url": "URL_APP"}]]}
+}
+```
+
+> O `iptables` precisou ser instalado manualmente no servidor (`dnf install iptables`) — a imagem base do Wazuh Server não vinha com nenhuma ferramenta de firewall instalada, algo só percebido ao inspecionar `/var/ossec/logs/active-responses.log` após o primeiro teste sem sucesso.
+
+#### Ambiente de execução do Shuffle
+
+- Servidor **Debian 12** dedicado (hardware próprio reaproveitado), sem interface gráfica;
+- **Docker** nativo + **Docker Swarm** (necessário para o Shuffle orquestrar os workers de execução de cada bloco do workflow);
+- Rede em **Bridged Adapter** direto no roteador, isolado das VMs do laboratório principal.
+
+> Rodar o Shuffle via Docker Desktop no Windows (WSL2) foi tentado primeiro, mas a combinação Swarm + WSL2 se mostrou instável (erros de rede interna do Docker). A migração para um servidor Linux dedicado resolveu de forma definitiva — reflexo de uma decisão de arquitetura tomada durante o próprio desenvolvimento, documentada aqui como aprendizado prático de infraestrutura.
 
 ---
 
@@ -629,7 +854,7 @@ Exemplos de técnicas mapeadas:
 |---|---|---|
 | T1110 | Brute Force | Tentativas repetidas de autenticação SSH |
 | T1046 | Network Service Discovery | Scans ou reconhecimento de rede |
-| T1059.001 | PowerShell | Execução de PowerShell no endpoint Windows |
+| T1059.001 | PowerShell | Execução de PowerShell no endpoint Windows (validado com Atomic Red Team) |
 | T1059.003 | Windows Command Shell | Execução de `cmd.exe` |
 | T1105 | Ingress Tool Transfer | Uso de HTTP/curl/wget/SimpleHTTP |
 | T1070 | Indicator Removal | Exclusão/limpeza de arquivos ou rastros |
@@ -639,6 +864,53 @@ Exemplos de técnicas mapeadas:
 Regra aplicada:
 
 > A IA só deve mapear técnicas MITRE quando houver evidência suficiente nos alertas. Caso contrário, deve informar que o mapeamento não foi identificado com segurança.
+
+---
+
+## 🧨 Validação de Detecção com Atomic Red Team
+
+Para validar que as técnicas mapeadas na tabela acima são realmente detectadas (e não apenas documentadas em teoria), o projeto passou a utilizar o [Atomic Red Team](https://github.com/redcanaryco/atomic-red-team) — uma biblioteca de testes de detecção mantida pela comunidade e mapeada oficialmente no MITRE ATT&CK, com mais de 340 técnicas disponíveis.
+
+### Ambiente de teste isolado
+
+Os testes ofensivos **não são executados no endpoint principal**. Foi criada uma VM Windows 11 dedicada (`Windows11-LabVM`, cadastrada como **Cliente C - H-tek Solutions** no multi-tenant simulado), isolada especificamente para esse propósito:
+
+- Snapshot limpo tirado antes de qualquer execução de teste, permitindo reverter em segundos;
+- Exclusão de pasta configurada no Windows Defender apenas para o diretório do Atomic Red Team, evitando interferência durante os testes;
+- Sysmon e Wazuh Agent configurados de forma idêntica ao endpoint principal, garantindo que a telemetria capturada seja comparável.
+
+### Metodologia
+
+```powershell
+# Listar testes disponíveis para uma técnica
+Invoke-AtomicTest T1059.001 -ShowDetailsBrief
+
+# Ver detalhes de um teste especifico antes de executar
+Invoke-AtomicTest T1059.001 -TestNumbers 17 -ShowDetails
+
+# Executar o teste
+Invoke-AtomicTest T1059.001 -TestNumbers 17
+```
+
+### Teste validado: T1059.001 (PowerShell)
+
+O teste **"PowerShell Command Execution"** (Atomic Test #17, originado do 2021 Threat Detection Report da Red Canary) executa um comando PowerShell codificado em Base64, sem exigir elevação de privilégio nem download de ferramenta externa — seguro o suficiente para validação em laboratório.
+
+Fluxo de validação:
+
+```text
+Atomic Red Team executa o teste
+        ↓
+Sysmon captura a execução do PowerShell
+        ↓
+Wazuh Agent envia o evento para o Manager
+        ↓
+Evento aparece em wazuh-alerts-*
+        ↓
+IA analisa e mapeia corretamente para T1059.001
+```
+
+> Nem todo teste da biblioteca é seguro para rodar sem critério — vários dependem de ferramentas externas reais (ex: Mimikatz, BloodHound/SharpHound) ou exigem infraestrutura de domínio (Active Directory). Antes de executar qualquer teste, o comando `-ShowDetails` é usado para revisar o que será executado.
 
 ---
 
@@ -832,14 +1104,13 @@ wazuh-ai-soc-lab/
 └── prints/
     ├── 01_login.png
     ├── 02_sobre_projeto.png
-    ├── 03_chat_ia.png
-    ├── 04_dashboard_ndr.png
-    ├── 05_dashboard_sysmon.png
-    ├── 06_relatorio_ia_mitre.png
-    ├── 07_playbook.png
-    ├── 08_correlacao.png
-    ├── 09_historico_sqlite.png
-    └── 10_downloads.png
+    ├── 03_SLA.png
+    ├── 04_dashboard_sysmon.png
+    ├── 05_dashboard_inventario.png
+    ├── 06_dashboard_NDR.png
+    ├── 07_Clientes.png
+    ├── 08_historico.png
+    └── 09_chat_ia.png
 ```
 
 > Observação: `data/`, `output/`, `logs/`, `.env` e evidências sensíveis ficam no `.gitignore` e não devem ser publicados com dados reais.
@@ -1025,8 +1296,9 @@ Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
 
 - **NDR Dashboard**: `https://IP_DO_WAZUH_SERVER/app/dashboards` → *NDR Dashboard - AI SOC Lab*
 - **Windows Endpoint / Sysmon**: `https://IP_DO_WAZUH_SERVER/app/dashboards` → *Windows Endpoint / Sysmon - AI SOC Lab*
+- **Inventário de Ativos**: `https://IP_DO_WAZUH_SERVER/app/dashboards` → *Inventario de Ativos - AI SOC Lab*
 
-> O IP é da rede interna do laboratório e pode variar conforme o ambiente. Ambos os dashboards utilizam tema escuro e uma combinação de gráficos de área, rosca, barras horizontais e tabelas.
+> O IP é da rede interna do laboratório e pode variar conforme o ambiente. Os três dashboards utilizam tema escuro e uma combinação de gráficos de área, rosca, barras horizontais, tabelas, mapas de calor, tag cloud e gauges, todos com filtro interativo por agente no topo.
 
 ---
 
@@ -1092,48 +1364,36 @@ Detectar → Correlacionar → Analisar com IA → Mapear MITRE → Gerar Playbo
 
 ## 🖼️ Capturas de Tela
 
+### Login
+![Login](prints/01_login.png)
+
 ### Dashboard NDR
-![NDR Dashboard](prints/04_dashboard_ndr.png)
+![NDR Dashboard](prints/06_dashboard_NDR.png)
 
 ### Dashboard Windows/Sysmon
-![Sysmon Dashboard](prints/05_dashboard_sysmon.png)
+![Sysmon Dashboard](prints/04_dashboard_sysmon.png)
 
-### Chat IA com Mapeamento MITRE ATT&CK
-![Relatório IA](prints/06_relatorio_ia_mitre.png)
+### Dashboard de Inventário de Ativos
+![Inventario Dashboard](prints/05_dashboard_inventario.png)
 
-> Demais capturas (login, playbook, correlação, histórico, downloads) disponíveis na pasta [`/prints`](prints/).
+### Chat IA
+![Chat IA](prints/09_chat_ia.png)
+
+> Demais capturas (Sobre o Projeto, SLA, Clientes, Histórico) disponíveis na pasta [`/prints`](prints/).
 
 ---
 
 ## 📌 Resultados Obtidos
 
-- ✅ Coleta de alertas do Wazuh via Indexer
-- ✅ Integração Suricata com Wazuh
-- ✅ Detecção de tráfego suspeito
-- ✅ Detecção de brute force SSH
-- ✅ Monitoramento de integridade de arquivos
-- ✅ Coleta de eventos Windows/Sysmon
-- ✅ Dashboard NDR (10 painéis)
-- ✅ Dashboard Windows/Sysmon (9 painéis)
-- ✅ Chat IA para análise de alertas
-- ✅ Login simples
-- ✅ Página Sobre o Projeto
-- ✅ Histórico persistente em SQLite
-- ✅ Identificação do analista logado
-- ✅ Geração de relatórios SOC (técnico e executivo)
-- ✅ Geração de playbooks
-- ✅ Correlação automática de eventos
-- ✅ Mapeamento MITRE ATT&CK
-- ✅ Exportação de evidências
-- ✅ Multi-tenant simulado (visão por cliente), com cadastro editável via banco
-- ✅ Painel de SLA simulado (TTD/TTR) por cliente
-- ✅ Threat Intelligence com AbuseIPDB (score de reputação, cache em banco)
-- ✅ Rate limiting no login
-- ✅ Health check (`/health`)
-- ✅ Logging estruturado com rotação de arquivo
-- ✅ Filtros e paginação no histórico
-- ✅ Scripts de automação para geração de eventos de teste
-- ✅ Menu com seções colapsáveis e logout fixo no topo
+Resumo do que está funcionando de ponta a ponta (detalhe completo de cada item nas seções acima):
+
+- ✅ **Detecção e telemetria**: alertas via Wazuh Indexer, Suricata (NDR), brute force SSH, FIM, eventos Windows/Sysmon, mapeamento MITRE ATT&CK validado com Atomic Red Team
+- ✅ **3 dashboards operacionais**: NDR (13 painéis), Windows/Sysmon (12 painéis) e Inventário de Ativos (11 painéis) — todos com filtro interativo, mapas de calor, gauges e tema escuro
+- ✅ **IA e automação SOC**: chat interativo, relatórios técnico e executivo, playbooks, correlação automática de eventos, histórico persistente com filtros/paginação
+- ✅ **Recursos de SOCaaS**: multi-tenant com cadastro editável via banco, painel de SLA (TTD/TTR), Threat Intelligence com AbuseIPDB
+- ✅ **SOAR**: automação de resposta com Shuffle, servidor Linux dedicado, notificação por Discord (embed) e Telegram (bot próprio, botões inline, roteamento por severidade), com Active Response nativo bloqueando IPs automaticamente via `firewall-drop` e notificação diferenciada quando uma ação é tomada
+- ✅ **Segurança e operação da aplicação**: login com rate limiting, health check, logging estruturado com rotação, exportação de evidências
+- ✅ **Portfólio**: scripts de automação de teste, ambiente isolado para testes ofensivos (VM com snapshot), menu com seções colapsáveis
 
 ---
 
@@ -1158,29 +1418,29 @@ A IA não substitui o analista, mas atua como apoio para reduzir o tempo de aná
 
 ## 🚀 Possíveis Melhorias Futuras
 
-- [ ] Integração com Shuffle SOAR
 - [ ] Integração com TheHive
 - [ ] Integração com Cortex
 - [ ] Integração com MISP
 - [ ] Integração com VirusTotal
-- [ ] Notificações via Telegram, Discord ou e-mail
 - [ ] Criação automática de tickets
 - [ ] Autenticação multiusuário
 - [ ] Controle de permissões por perfil
-- [ ] Deploy via Docker
 - [ ] Exportação em PDF
 - [ ] Relatórios em HTML
-- [ ] Integração com Active Response para ações semi-automatizadas
+- [ ] Estender Active Response para outros tipos de ataque além de brute force SSH (hoje só regras 5710/5712)
 - [ ] Página de incidentes com status de tratamento
 - [ ] Habilitar Event ID 3 (Network Connection) no Sysmon do Windows para adicionar painel de conexões de rede
 - [ ] Persistir rate limiting em Redis/banco (hoje é em memória, reseta a cada restart)
+- [ ] Formatar timestamp das notificações em padrão brasileiro (limitação de acesso a índice de array identificada no builder visual do Shuffle)
+- [ ] Fixar mensagens críticas no topo do chat do Telegram (`pinChatMessage`)
+- [ ] Deploy via Docker Compose para o restante da aplicação (hoje só o Shuffle roda em container)
 - [ ] GIF/vídeo curto de demonstração para o README
 
 ---
 
 ## ⚠️ Observações de Segurança
 
-Este projeto foi desenvolvido para fins educacionais e deve ser executado em **ambiente controlado**.
+Este é um ambiente de laboratório/teste e deve ser executado em **ambiente controlado**, não exposto diretamente à internet.
 
 Recomendações:
 
@@ -1196,7 +1456,7 @@ Recomendações:
 
 **Bruno Neemias**
 
-Projeto desenvolvido como laboratório acadêmico e prático de segurança defensiva, com foco em SIEM, SOC, NDR, XDR, Sysmon, Active Response e Inteligência Artificial aplicada à análise de alertas.
+Projeto de segurança defensiva com foco em SIEM, SOC, NDR, XDR, Sysmon, Active Response e Inteligência Artificial aplicada à análise de alertas, desenvolvido para explorar na prática arquiteturas de SOCaaS.
 
 [LinkedIn](https://linkedin.com/in/brunoneemias) [GitHub](https://github.com/brunoneemias)
 
@@ -1204,10 +1464,8 @@ Projeto desenvolvido como laboratório acadêmico e prático de segurança defen
 
 ## 🏁 Conclusão
 
-O laboratório demonstra a evolução de um ambiente Wazuh tradicional para uma arquitetura mais completa, integrando telemetria de rede, Linux, Windows e IA — e, mais recentemente, para uma prova de conceito de operação SOCaaS.
+O projeto evoluiu de um ambiente Wazuh tradicional para uma arquitetura mais completa, integrando telemetria de rede, Linux, Windows e IA — e, mais recentemente, para uma prova de conceito de operação SOCaaS com automação de resposta via SOAR. O foco não foi empilhar ferramentas, mas construir uma camada de automação e análise própria em cima de uma base de SIEM sólida, validada com testes reais de detecção (Atomic Red Team) e fechando o ciclo detectar → analisar → notificar sem intervenção manual.
 
-A solução final permite que um analista SOC consulte alertas, gere relatórios técnicos e executivos, crie playbooks, correlacione eventos, mapeie técnicas MITRE ATT&CK, visualize histórico persistente com filtros e paginação, acompanhe múltiplos clientes simulados (com cadastro editável), monitore métricas de SLA, enriqueça IPs com Threat Intelligence e baixe evidências diretamente por uma interface web — com rate limiting, health check e logging estruturado dando suporte operacional por trás.
+A plataforma reproduz um cenário corporativo de produção e coloca em prática conceitos de:
 
-O projeto simula um cenário corporativo de produção em laboratório e demonstra na prática conceitos de:
-
-`SIEM` · `XDR` · `NDR` · `FIM` · `Sysmon` · `Active Response` · `Threat Hunting` · `Threat Intelligence` · `Incident Response` · `SOC Automation` · `MITRE ATT&CK` · `SOCaaS` · `AI-assisted Security Operations`
+`SIEM` · `XDR` · `NDR` · `FIM` · `Sysmon` · `Active Response` · `Threat Hunting` · `Threat Intelligence` · `Incident Response` · `SOC Automation` · `SOAR` · `MITRE ATT&CK` · `SOCaaS` · `AI-assisted Security Operations`
