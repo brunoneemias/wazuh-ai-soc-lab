@@ -1390,6 +1390,20 @@ def login():
 
     return render_template("login.html", erro=erro)
 
+@app.route("/api/reputacao/<ip>", methods=["GET"])
+def api_reputacao(ip):
+    """
+    Endpoint simples de consulta, pra uso por sistemas externos (ex: Shuffle SOAR).
+    Retorna a reputacao de um IP via AbuseIPDB (com cache), reaproveitando
+    a mesma logica usada na tela /threat-intel.
+    """
+    try:
+        resultado = obter_reputacao_ip(ip)
+        return jsonify(resultado), 200
+    except Exception as e:
+        return jsonify({"ip": ip, "erro": str(e)}), 200
+
+
 @app.route("/api/cliente/<agente>", methods=["GET"])
 def api_cliente(agente):
     """
@@ -1404,7 +1418,6 @@ def api_cliente(agente):
         return jsonify({"agente": agente, "cliente": CLIENTE_PADRAO, "erro": str(e)}), 200
 
 
-@app.route("/health", methods=["GET"])
 
 @app.route("/health", methods=["GET"])
 def health():
